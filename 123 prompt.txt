@@ -1,0 +1,74 @@
+**Assunto:** Localizar o calendário da página de Agendamentos para Português do Brasil (pt-BR)
+
+**Arquivo a ser modificado:** `src/react-app/pages/Appointments.tsx`
+
+**Descrição:**
+
+Preciso ajustar o componente `BigCalendar` no arquivo `Appointments.tsx` para que ele exiba os dias da semana e os horários no formato Português do Brasil (pt-BR).
+
+**Requisitos:**
+
+1.  **Tradução dos Dias da Semana:** Os cabeçalhos dos dias na visualização de semana e mês devem ser abreviados em português.
+
+      * **Atualmente (Inglês):** `Sun`, `Mon`, `Tue`, `Wed`, `Thu`, `Fri`, `Sat`
+      * **Desejado (Português):** `Dom`, `Seg`, `Ter`, `Qua`, `Qui`, `Sex`, `Sáb`
+
+2.  **Formato de 24 horas:** As horas exibidas na lateral do calendário (na visualização de semana e dia) devem usar o formato de 24 horas, sem AM/PM.
+
+      * **Atualmente (AM/PM):** `1:00 PM`, `2:00 PM`
+      * **Desejado (24h):** `13:00`, `14:00`
+
+**Guia de Implementação:**
+
+O componente `BigCalendar` aceita uma propriedade `formats` para customizar as formatações de data e hora, e a propriedade `culture` para definir a localidade. O `moment.js`, que já está sendo usado, precisa ser configurado corretamente.
+
+**Exemplo de como aplicar as alterações:**
+
+Por favor, localize a declaração do componente `<BigCalendar>` e adicione as seguintes propriedades:
+
+```tsx
+// src/react-app/pages/Appointments.tsx
+
+// ... outras importações
+import moment from 'moment';
+import 'moment/locale/pt-br'; // Garanta que o locale está importado
+
+// ...
+
+// Dentro do componente Appointments
+const formats = {
+  // Formato para a coluna de horas na visualização de semana/dia
+  timeGutterFormat: 'HH:mm', 
+  
+  // Formato para os dias no cabeçalho da visualização de semana
+  dayFormat: 'ddd D/M',
+
+  // Formato para os dias no cabeçalho da visualização de mês
+  weekdayFormat: 'ddd', 
+};
+
+// ... no JSX de retorno
+
+<BigCalendar
+  // ... outras props existentes
+  localizer={localizer}
+  events={calendarEvents}
+  culture='pt-br' // Define a cultura para o calendário
+  formats={formats} // Aplica os formatos customizados
+  messages={{
+    next: 'Próximo',
+    previous: 'Anterior',
+    today: 'Hoje',
+    month: 'Mês',
+    week: 'Semana',
+    day: 'Dia',
+    agenda: 'Agenda',
+    date: 'Data',
+    time: 'Hora',
+    event: 'Evento',
+    noEventsInRange: 'Nenhum agendamento neste período.',
+    showMore: (total: number) => `+ Ver mais (${total})`,
+  }}
+  // ... resto das props
+/>
+```
