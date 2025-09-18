@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
@@ -7,15 +7,15 @@ import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  X, 
-  FileText, 
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  FileText,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
@@ -30,7 +30,7 @@ import autoTable from 'jspdf-autotable';
 // --- Interfaces e Tipos ---
 interface FinancialFormData {
     description: string;
-    amount: number | null; 
+    amount: number | null;
     type: 'receita' | 'despesa';
     entry_type: 'pontual' | 'fixa';
     entry_date: string;
@@ -46,9 +46,9 @@ const defaultFormValues: FinancialFormData = {
 
 // --- Componente Principal ---
 export default function Financial() {
-  const { user } = useSupabaseAuth(); 
+  const { user } = useSupabaseAuth();
   const { showSuccess, showError } = useToastHelpers();
-  
+
   // --- Estados ---
   const [entries, setEntries] = useState<FinancialEntryType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +58,14 @@ export default function Financial() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<FinancialEntryType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
-  // NOVO: Estado para controlar o mês de visualização
+
+  // Estado para controlar o mês de visualização
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // NOVOS ESTADOS PARA FILTROS
+  const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>('all');
+  const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'pontual' | 'fixa'>('all');
+
 
   const [kpis, setKpis] = useState({
     monthlyRevenue: 0,
@@ -77,11 +82,11 @@ export default function Financial() {
     resolver: zodResolver(CreateFinancialEntrySchema),
     defaultValues: defaultFormValues,
   });
-  
-  // --- Funções de Busca de Dados (Agora baseadas no mês) ---
+
+  // --- Funções de Busca de Dados ---
   const fetchEntries = useCallback(async (date: Date) => {
     if (!user) return [];
-    
+
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
@@ -96,10 +101,10 @@ export default function Financial() {
     if (error) throw error;
     return data || [];
   }, [user]);
-  
+
   const fetchKPIs = useCallback(async (date: Date) => {
     if (!user) return { monthlyRevenue: 0, monthlyExpenses: 0 };
-    
+
     const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
     const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
@@ -133,7 +138,7 @@ export default function Financial() {
         fetchEntries(date),
         fetchKPIs(date)
       ]);
-      
+
       if (entriesData) setEntries(entriesData);
       if (kpisData) {
          setKpis({
@@ -150,19 +155,25 @@ export default function Financial() {
       setLoading(false);
     }
   }, [user, fetchEntries, fetchKPIs, showError]);
-  
-  // Efeito que busca os dados quando o usuário ou a data mudam
+
   useEffect(() => {
     if (user) {
       fetchEntriesAndKPIs(currentDate);
     }
   }, [user, currentDate, fetchEntriesAndKPIs]);
 
+  const filteredEntries = useMemo(() => {
+    return entries
+      .filter(entry => typeFilter === 'all' || entry.type === typeFilter)
+      .filter(entry => frequencyFilter === 'all' || entry.entry_type === frequencyFilter);
+  }, [entries, typeFilter, frequencyFilter]);
+
+
   // --- Manipuladores de Eventos ---
   const handlePreviousMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
-  
+
   const handleNextMonth = () => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
@@ -174,7 +185,7 @@ export default function Financial() {
   const onSubmit = async (formData: Omit<FinancialFormData, 'amount'> & { amount: number }) => {
     if (!user) return;
     setError(null);
-    
+
     const entryData = {
       ...formData,
       amount: Math.round(formData.amount * 100),
@@ -188,7 +199,7 @@ export default function Financial() {
         await supabase.from('financial_entries').insert([{ ...entryData, user_id: user.id }]);
         showSuccess('Entrada adicionada!');
       }
-      
+
       await fetchEntriesAndKPIs(currentDate);
       handleCloseModal();
     } catch (err: any) {
@@ -197,7 +208,7 @@ export default function Financial() {
       console.error('Erro ao salvar entrada financeira:', err.message);
     }
   };
-  
+
   const handleDeleteClick = (entry: FinancialEntryType) => {
     setEntryToDelete(entry);
     setIsConfirmModalOpen(true);
@@ -205,7 +216,7 @@ export default function Financial() {
 
   const handleDeleteConfirm = async () => {
     if (!user || !entryToDelete) return;
-    
+
     setIsDeleting(true);
     try {
       await supabase.from('financial_entries').delete().eq('id', entryToDelete.id!);
@@ -242,36 +253,34 @@ export default function Financial() {
     reset(defaultFormValues);
     setError(null);
   };
-  
+
   const handleExportPDF = () => {
     const doc = new jsPDF();
     const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
     doc.text(`Relatório Financeiro - ${monthName}`, 14, 16);
-  
-    const tableBody = entries.map((e: FinancialEntryType) => [
+
+    const tableBody = filteredEntries.map((e: FinancialEntryType) => [
       formatDate(e.entry_date),
       e.description,
       e.type === 'receita' ? 'Receita' : 'Despesa',
       e.entry_type === 'pontual' ? 'Pontual' : 'Fixa',
       formatCurrency(e.amount)
     ]);
-  
+
     autoTable(doc, {
       startY: 20,
       head: [['Data', 'Descrição', 'Tipo', 'Frequência', 'Valor']],
       body: tableBody,
       didParseCell: function (data) {
-        // Colore o texto do valor baseado no tipo de entrada
-        if (data.column.index === 4) { // Coluna 'Valor'
+        if (data.column.index === 4) {
           if (data.cell.raw && data.row.raw[2] === 'Receita') {
-            data.cell.styles.textColor = [0, 128, 0]; // Verde
+            data.cell.styles.textColor = [0, 128, 0];
           } else if (data.cell.raw && data.row.raw[2] === 'Despesa') {
-            data.cell.styles.textColor = [255, 0, 0]; // Vermelho
+            data.cell.styles.textColor = [255, 0, 0];
           }
         }
       },
       didDrawPage: function (data) {
-        // Adiciona o rodapé com os totais
         const finalY = data.cursor?.y;
         if (finalY) {
             doc.setFontSize(10);
@@ -283,18 +292,19 @@ export default function Financial() {
         }
       },
     });
-  
+
     doc.save(`relatorio_financeiro_${currentDate.getFullYear()}_${currentDate.getMonth() + 1}.pdf`);
   };
-  
+
 
   const handleExportCSV = () => {
     const csvContent = [
-      ['Data', 'Descrição', 'Tipo', 'Valor (R$)'],
-      ...entries.map((e: FinancialEntryType) => [
+      ['Data', 'Descrição', 'Tipo', 'Frequência', 'Valor (R$)'],
+      ...filteredEntries.map((e: FinancialEntryType) => [
         formatDate(e.entry_date),
         e.description,
         e.type === 'receita' ? 'Receita' : 'Despesa',
+        e.entry_type === 'pontual' ? 'Pontual' : 'Fixa',
         (e.amount / 100).toFixed(2).replace('.', ',')
       ])
     ].map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(';')).join('\n');
@@ -309,7 +319,7 @@ export default function Financial() {
     link.click();
     document.body.removeChild(link);
   };
-  
+
   if (loading && !isModalOpen) {
     return <Layout><LoadingSpinner /></Layout>;
   }
@@ -351,8 +361,7 @@ export default function Financial() {
             </button>
           </div>
         </div>
-        
-        {/* --- NOVO: Controles de Navegação de Mês --- */}
+
         <div className="mt-6 flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
             <button onClick={handlePreviousMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
                 <ChevronLeft className="h-5 w-5 text-gray-600" />
@@ -367,7 +376,7 @@ export default function Financial() {
                 <ChevronRight className="h-5 w-5 text-gray-600" />
             </button>
         </div>
-        
+
         {error && !isModalOpen && (
             <div className="bg-red-50 p-4 rounded-md my-4 flex items-center">
                 <AlertCircle className="h-5 w-5 text-red-500 mr-3" />
@@ -431,15 +440,47 @@ export default function Financial() {
 
         <div className="mt-8">
           <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Lançamentos do Mês</h3>
+            {/* --- CABEÇALHO DA TABELA MODIFICADO --- */}
+            <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <h3 className="text-lg font-medium text-gray-900 whitespace-nowrap">Lançamentos do Mês</h3>
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
+                  {/* Filtro por Tipo */}
+                  <div className='w-full sm:w-auto'>
+                      <label htmlFor="type-filter" className="sr-only">Filtrar por tipo</label>
+                      <select
+                      id="type-filter"
+                      value={typeFilter}
+                      onChange={(e) => setTypeFilter(e.target.value as any)}
+                      className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500"
+                      >
+                      <option value="all">Todos os Tipos</option>
+                      <option value="receita">Receitas</option>
+                      <option value="despesa">Despesas</option>
+                      </select>
+                  </div>
+                  {/* Filtro por Frequência */}
+                  <div className='w-full sm:w-auto'>
+                      <label htmlFor="frequency-filter" className="sr-only">Filtrar por frequência</label>
+                      <select
+                      id="frequency-filter"
+                      value={frequencyFilter}
+                      onChange={(e) => setFrequencyFilter(e.target.value as any)}
+                      className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500"
+                      >
+                      <option value="all">Todas as Frequências</option>
+                      <option value="pontual">Pontual</option>
+                      <option value="fixa">Fixa</option>
+                      </select>
+                  </div>
+              </div>
             </div>
-            {entries.length === 0 ? (
+
+            {filteredEntries.length === 0 ? (
               <div className="text-center py-12">
                 <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma entrada neste mês</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma entrada encontrada</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Comece registrando uma receita ou despesa para este período.
+                  Não há lançamentos para os filtros selecionados neste mês.
                 </p>
               </div>
             ) : (
@@ -450,12 +491,13 @@ export default function Financial() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequência</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {entries.map((entry) => (
+                    {filteredEntries.map((entry) => (
                       <tr key={entry.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(entry.entry_date)}</td>
                         <td className="px-6 py-4 text-sm text-gray-900">{entry.description}</td>
@@ -463,6 +505,11 @@ export default function Financial() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${entry.type === 'receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {entry.type === 'receita' ? 'Receita' : 'Despesa'}
                           </span>
+                        </td>
+                         <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
+                              {entry.entry_type}
+                            </span>
                         </td>
                         <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${entry.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                           {entry.type === 'receita' ? '+' : '-'}{formatCurrency(entry.amount)}
@@ -479,7 +526,7 @@ export default function Financial() {
             )}
           </div>
         </div>
-        
+
         {isModalOpen && (
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
