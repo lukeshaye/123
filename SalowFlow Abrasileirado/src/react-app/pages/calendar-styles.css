@@ -1,0 +1,60 @@
+/* Estilos personalizados para o componente React Big Calendar */
+
+/* --- Estilo Base do Evento --- */
+/* A cor de fundo e bordas são definidas dinamicamente em Appointments.tsx via 'eventPropGetter'. */
+/* Este CSS define os estilos base que não mudam. */
+.rbc-event {
+  /* A propriedade 'background' foi removida para permitir a estilização dinâmica via JavaScript. */
+  border: none !important;
+  color: white !important;
+  border-radius: 4px !important;
+  box-sizing: border-box !important;
+  padding: 2px 5px !important;
+  font-weight: 500 !important;
+  /* Removido display:flex e propriedades relacionadas, pois o layout agora é 'block'
+     e o conteúdo é controlado pelo componente CustomEvent. */
+}
+
+/* --- Correção da Largura do Card do Evento --- */
+.rbc-day-slot .rbc-event {
+  left: 0 !important;
+  width: 100% !important;
+}
+
+/* --- Correção da Largura do Segmento do Evento --- */
+.rbc-row-segment {
+  width: 100%;
+}
+
+/*
+ * Alvo: O contêiner principal de todos os eventos dentro de uma coluna de dia/hora.
+ * Ação: Força este contêiner a se esticar por toda a largura da coluna
+ * e torna seu fundo transparente para não cobrir a grade.
+*/
+.rbc-events-container {
+  width: 100% !important;
+  right: 0 !important;
+  left: 0 !important;
+  margin-right: 0 !important;
+  background-color: transparent !important;
+}
+
+/* Garante que o texto dentro do evento seja legível e quebre a linha */
+.rbc-event-label,
+.rbc-event-content {
+  font-size: 0.75rem;
+  white-space: normal !important;
+  max-height: 100%;
+}
+
+/* --- Centralização do Horário na Calha Lateral --- */
+.rbc-time-gutter .rbc-time-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Oculta a linha de eventos de "dia inteiro" para um visual mais limpo --- */
+.rbc-allday-cell {
+  display: none !important;
+}
