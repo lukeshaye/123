@@ -14,18 +14,20 @@ export const ClientSchema = z.object({
 export const CreateClientSchema = ClientSchema.omit({ id: true, user_id: true });
 
 // =================================================================
-// --- Schemas de Profissionais ---
+// --- Schemas de Profissionais (COM CAMPO DE COR) ---
 // =================================================================
 export const ProfessionalSchema = z.object({
   id: z.number().optional(),
   user_id: z.string(),
   name: z.string().min(1, "Nome do profissional é obrigatório"),
+  // NOVO: Campo para a cor associada ao profissional
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Formato de cor inválido. Use hexadecimal, ex: #RRGGBB").optional().nullable(),
 });
 export const CreateProfessionalSchema = ProfessionalSchema.omit({ id: true, user_id: true });
 
 
 // =================================================================
-// --- Schemas de Serviços (NOVO) ---
+// --- Schemas de Serviços (COM CAMPO DE COR) ---
 // =================================================================
 export const ServiceSchema = z.object({
   id: z.number().optional(),
@@ -34,6 +36,8 @@ export const ServiceSchema = z.object({
   description: z.string().optional().nullable(),
   price: z.number().positive("O preço deve ser um número positivo"),
   duration: z.number().int().positive("A duração deve ser um número inteiro positivo (em minutos)"),
+  // NOVO: Campo para a cor associada ao serviço
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Formato de cor inválido. Use hexadecimal, ex: #RRGGBB").optional().nullable(),
 });
 export const CreateServiceSchema = ServiceSchema.omit({ id: true, user_id: true });
 

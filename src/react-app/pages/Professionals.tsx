@@ -1,26 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
 import { useAppStore } from '../../shared/store';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
-import { Plus, Edit, Trash2, X, Briefcase } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Briefcase, Palette } from 'lucide-react';
 import type { ProfessionalType } from '../../shared/types';
-import { CreateProfessionalSchema } from '../../shared/types';
 
-interface ProfessionalFormData {
-  name: string;
-  work_start_time?: string;
-  work_end_time?: string;
-  lunch_start_time?: string;
-  lunch_end_time?: string;
-}
+// Esquema de validação Zod que inclui o novo campo de cor e os campos de horário existentes.
+const ProfessionalFormSchema = z.object({
+  name: z.string().min(1, "O nome do profissional é obrigatório"),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida").optional().nullable(),
+  work_start_time: z.string().optional().nullable(),
+  work_end_time: z.string().optional().nullable(),
+  lunch_start_time: z.string().optional().nullable(),
+  lunch_end_time: z.string().optional().nullable(),
+});
 
+// Interface para os dados do formulário, derivada do esquema Zod.
+type ProfessionalFormData = z.infer<typeof ProfessionalFormSchema>;
+
+// Valores padrão para o formulário.
 const defaultFormValues: ProfessionalFormData = {
     name: '',
+    color: '#8b5cf6', // Cor padrão (violeta)
     work_start_time: '',
     work_end_time: '',
     lunch_start_time: '',
@@ -29,13 +36,13 @@ const defaultFormValues: ProfessionalFormData = {
 
 export default function Professionals() {
   const { user } = useSupabaseAuth();
-  const { 
-    professionals, 
-    loading, 
-    fetchProfessionals, 
-    addProfessional, 
-    updateProfessional, 
-    deleteProfessional 
+  const {
+    professionals,
+    loading,
+    fetchProfessionals,
+    addProfessional,
+    updateProfessional,
+    deleteProfessional
   } = useAppStore();
   const { showSuccess, showError } = useToastHelpers();
   
@@ -49,11 +56,16 @@ export default function Professionals() {
     register,
     handleSubmit,
     reset,
+    watch, // <-- Adicionado para observar os campos
+    setValue, // <-- Adicionado para definir valores programaticamente
     formState: { errors, isSubmitting },
   } = useForm<ProfessionalFormData>({
-    resolver: zodResolver(CreateProfessionalSchema),
+    resolver: zodResolver(ProfessionalFormSchema),
     defaultValues: defaultFormValues
   });
+
+  // Observa o valor do campo 'color' em tempo real
+  const watchedColor = watch('color');
 
   useEffect(() => {
     if (user) {
@@ -63,12 +75,24 @@ export default function Professionals() {
 
   const onSubmit = async (formData: ProfessionalFormData) => {
     if (!user) return;
+
+    // Transforma strings vazias dos campos de tempo em null antes de enviar
+    const dataToSubmit = {
+      ...formData,
+      work_start_time: formData.work_start_time || null,
+      work_end_time: formData.work_end_time || null,
+      lunch_start_time: formData.lunch_start_time || null,
+      lunch_end_time: formData.lunch_end_time || null,
+    };
+
     try {
       if (editingProfessional) {
-        await updateProfessional({ ...editingProfessional, ...formData });
+        // @ts-ignore
+        await updateProfessional({ ...editingProfessional, ...dataToSubmit });
         showSuccess('Profissional atualizado!', 'As alterações foram salvas com sucesso.');
       } else {
-        await addProfessional(formData, user.id);
+        // @ts-ignore
+        await addProfessional(dataToSubmit, user.id);
         showSuccess('Profissional adicionado!', 'O novo profissional foi adicionado à sua equipe.');
       }
       handleCloseModal();
@@ -107,11 +131,17 @@ export default function Professionals() {
 
   const handleEditProfessional = (professional: ProfessionalType) => {
     setEditingProfessional(professional);
-    reset({ 
+    reset({
       name: professional.name,
+      // @ts-ignore
+      color: professional.color || defaultFormValues.color,
+      // @ts-ignore
       work_start_time: professional.work_start_time || '',
+      // @ts-ignore
       work_end_time: professional.work_end_time || '',
+      // @ts-ignore
       lunch_start_time: professional.lunch_start_time || '',
+      // @ts-ignore
       lunch_end_time: professional.lunch_end_time || '',
     });
     setIsModalOpen(true);
@@ -159,45 +189,58 @@ export default function Professionals() {
                     </p>
                   </div>
               ) : (
-                <table className="min-w-full divide-y divide-gray-300">
-                  <thead>
-                    <tr>
-                      <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-0">Nome</th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Horário de Trabalho</th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Horário de Almoço</th>
-                      <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-0">
-                        <span className="sr-only">Ações</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {professionals.map((professional) => (
-                      <tr key={professional.id}>
-                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-0">{professional.name}</td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {professional.work_start_time && professional.work_end_time 
-                            ? `${professional.work_start_time} - ${professional.work_end_time}`
-                            : 'Não definido'
-                          }
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {professional.lunch_start_time && professional.lunch_end_time 
-                            ? `${professional.lunch_start_time} - ${professional.lunch_end_time}`
-                            : 'Não definido'
-                          }
-                        </td>
-                        <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                          <button onClick={() => handleEditProfessional(professional)} className="text-indigo-600 hover:text-indigo-900 mr-4">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteClick(professional)} className="text-red-600 hover:text-red-900">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
+                <div className="bg-white shadow-sm rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Nome</th>
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Cor</th>
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 hidden sm:table-cell">Horário de Trabalho</th>
+                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 hidden sm:table-cell">Horário de Almoço</th>
+                        <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                          <span className="sr-only">Ações</span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {professionals.map((professional) => (
+                        <tr key={professional.id}>
+                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{professional.name}</td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <div className="flex items-center gap-2">
+                                {/* @ts-ignore */}
+                                <div className="h-5 w-5 rounded-full border border-gray-300" style={{ backgroundColor: professional.color || '#cccccc' }} />
+                                {/* @ts-ignore */}
+                                <span className="hidden md:inline">{professional.color || 'N/D'}</span>
+                            </div>
+                          </td>
+                          {/* @ts-ignore */}
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 hidden sm:table-cell">
+                            {professional.work_start_time && professional.work_end_time 
+                              ? `${professional.work_start_time} - ${professional.work_end_time}`
+                              : 'Não definido'
+                            }
+                          </td>
+                          {/* @ts-ignore */}
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 hidden sm:table-cell">
+                            {professional.lunch_start_time && professional.lunch_end_time 
+                              ? `${professional.lunch_start_time} - ${professional.lunch_end_time}`
+                              : 'Não definido'
+                            }
+                          </td>
+                          <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                            <button onClick={() => handleEditProfessional(professional)} className="text-indigo-600 hover:text-indigo-900 mr-4">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteClick(professional)} className="text-red-600 hover:text-red-900">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -226,6 +269,32 @@ export default function Professionals() {
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
                         />
                         {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
+                      </div>
+
+                      {/* Bloco de cor corrigido */}
+                      <div>
+                          <label htmlFor="color" className="block text-sm font-medium text-gray-700">Cor de Identificação</label>
+                          <div className="mt-1 flex items-center gap-3">
+                            <div className="relative">
+                                <input
+                                  type="color"
+                                  // O valor agora é controlado pelo 'watch'
+                                  value={watchedColor || '#ffffff'}
+                                  // Ao mudar, atualizamos o estado do formulário com setValue
+                                  onChange={(e) => setValue('color', e.target.value, { shouldValidate: true })}
+                                  className="p-1 h-10 w-10 block bg-white border border-gray-300 rounded-md cursor-pointer"
+                                />
+                                <Palette className="w-4 h-4 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-600 pointer-events-none" />
+                            </div>
+                            <input
+                                type="text"
+                                // O campo de texto usa o register e reflete as mudanças
+                                {...register('color')}
+                                placeholder="#8b5cf6"
+                                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
+                            />
+                          </div>
+                          {errors.color && <p className="mt-1 text-sm text-red-600">{errors.color.message}</p>}
                       </div>
                       
                       <div className="grid grid-cols-2 gap-4">

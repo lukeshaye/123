@@ -183,31 +183,22 @@ export default function Appointments() {
   const onSubmit = async (data: AppointmentFormData) => {
     if (!user) return;
     
-    // Validação de Conflito de Horários
     const newStart = moment(data.appointment_date);
     const newEnd = moment(data.end_date);
     const professionalId = Number(data.professional_id);
 
     const conflictingAppointment = appointments.find(app => {
-        // Ignora o próprio agendamento ao editar
-        if (editingAppointment && app.id === editingAppointment.id) {
-            return false;
-        }
-        
-        // Verifica se é do mesmo profissional
-        if (app.professional_id !== professionalId) {
-            return false;
-        }
+        if (editingAppointment && app.id === editingAppointment.id) return false;
+        if (app.professional_id !== professionalId) return false;
 
         const existingStart = moment(app.appointment_date);
         const existingEnd = moment(app.end_date);
         
-        // Verifica sobreposição
         return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
     });
 
     if (conflictingAppointment) {
-        showError("Conflito de Horário", "O profissional selecionado já tem um agendamento neste horário. Por favor, escolha outro horário ou profissional.");
+        showError("Conflito de Horário", "O profissional selecionado já tem um agendamento neste horário.");
         return;
     }
     
@@ -301,6 +292,29 @@ export default function Appointments() {
     setIsModalOpen(true);
   }, [reset]);
   
+  // NOVA FUNÇÃO: Define o estilo do evento com base na cor do profissional.
+  const eventPropGetter = useCallback(
+    (event: CalendarEvent) => {
+      const professional = professionals.find(
+        (p: ProfessionalType) => p.id === event.resource.professional_id
+      );
+      // @ts-ignore
+      const professionalColor = professional?.color;
+
+      // Não aplica a cor na visualização "Agenda"
+      if (professionalColor && view !== 'agenda') {
+        return {
+          style: {
+            backgroundColor: professionalColor,
+            borderColor: professionalColor,
+          },
+        };
+      }
+      return {};
+    },
+    [professionals, view] // Depende da lista de profissionais e da visualização atual
+  );
+
   if (loading.clients || loading.professionals || loading.services || loading.businessHours) {
     return <Layout><LoadingSpinner /></Layout>;
   }
@@ -355,6 +369,7 @@ export default function Appointments() {
               onSelectEvent={handleSelectEvent}
               selectable
               culture='pt-br'
+              eventPropGetter={eventPropGetter} // <-- ADICIONADO AQUI
               messages={{
                 next: 'Próximo',
                 previous: 'Anterior',

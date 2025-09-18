@@ -7,25 +7,27 @@ import Layout from '@/react-app/components/Layout';
 import LoadingSpinner from '@/react-app/components/LoadingSpinner';
 import ConfirmationModal from '@/react-app/components/ConfirmationModal';
 import { useToastHelpers } from '@/react-app/contexts/ToastContext';
-import { Scissors, Plus, Edit, Trash2, Clock, X, Search } from 'lucide-react';
+import { Scissors, Plus, Edit, Trash2, Clock, X, Search, Palette } from 'lucide-react';
 import type { ServiceType } from '@/shared/types';
 import { CreateServiceSchema } from '@/shared/types';
 import { formatCurrency } from '@/react-app/utils';
 
-// --- Definição de Tipos ---
+// --- Definição de Tipos (com o campo 'color') ---
 interface ServiceFormData {
   name: string;
   description?: string;
   price: number;
   duration: number; // Duração em minutos
+  color?: string;
 }
 
-// Valores padrão para o formulário
+// Valores padrão para o formulário (com uma cor default)
 const defaultFormValues: ServiceFormData = {
   name: '',
   description: '',
   price: 0,
   duration: 30,
+  color: '#8b5cf6', // Cor padrão violeta
 };
 
 /**
@@ -55,10 +57,13 @@ export default function Services() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
+    watch
   } = useForm<ServiceFormData>({
-    resolver: zodResolver(CreateServiceSchema) as any,
+    resolver: zodResolver(CreateServiceSchema) as any, // Assume que o schema em types.ts foi atualizado
     defaultValues: defaultFormValues,
   });
+
+  const watchedColor = watch('color');
 
   useEffect(() => {
     if (user) {
@@ -135,6 +140,7 @@ export default function Services() {
       description: service.description || '',
       price: service.price / 100,
       duration: service.duration,
+      color: service.color || defaultFormValues.color,
     });
     setIsModalOpen(true);
   };
@@ -217,6 +223,7 @@ export default function Services() {
                 <div
                   key={service.id}
                   className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 hover:shadow-md transition-shadow flex flex-col justify-between"
+                  style={{ borderTop: `4px solid ${service.color || '#cccccc'}` }}
                 >
                   <div className="px-6 py-4">
                     <div className="flex items-start justify-between mb-3">
@@ -339,6 +346,24 @@ export default function Services() {
                           {errors.duration && <p className="mt-1 text-sm text-red-600">{errors.duration.message}</p>}
                         </div>
                       </div>
+                      
+                      <div>
+                        <label htmlFor="color" className="block text-sm font-medium text-gray-700">
+                          Cor de Identificação
+                        </label>
+                        <div className="mt-1 flex items-center gap-x-3">
+                          <input
+                              type="color"
+                              {...register('color')}
+                              className="block h-10 w-16 cursor-pointer rounded-md border-gray-300"
+                          />
+                          <div className="flex h-10 items-center rounded-md border border-gray-300 px-3 text-sm" style={{ backgroundColor: watchedColor, color: '#fff' }}>
+                              {watchedColor}
+                          </div>
+                        </div>
+                        {errors.color && <p className="mt-1 text-sm text-red-600">{errors.color.message}</p>}
+                      </div>
+
                     </div>
                   </div>
 
