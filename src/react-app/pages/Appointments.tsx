@@ -15,8 +15,10 @@ import type { AppointmentType, ClientType, BusinessHoursType, ProfessionalType, 
 import { AppointmentFormSchema } from '../../shared/types';
 import { useToastHelpers } from '../contexts/ToastContext';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useSwipeable } from 'react-swipeable';
 
-// --- Configuração do Localizer (Completo em PT-BR) ---
+// --- Configuração do Localizer (Mantendo a sua personalização completa) ---
 moment.locale('pt-br');
 moment.updateLocale('pt-br', {
   months: [
@@ -61,6 +63,26 @@ interface CalendarEvent {
   resource: AppointmentType;
 }
 
+// --- Componente de Evento Customizado para Melhor Leitura ---
+interface CustomEventProps {
+  event: CalendarEvent;
+}
+
+const CustomEvent = ({ event }: CustomEventProps) => {
+  const { clients, services, professionals } = useAppStore.getState();
+  const client = clients.find(c => c.id === event.resource.client_id);
+  const service = services.find(s => s.id === event.resource.service_id);
+  const professional = professionals.find(p => p.id === event.resource.professional_id);
+
+  return (
+    <div className="p-1 text-white text-xs overflow-hidden h-full flex flex-col">
+      <p className="font-bold truncate">{client?.name || event.resource.client_name}</p>
+      <p className="truncate flex-grow">{service?.name || event.resource.service}</p>
+      <p className="text-white/80 truncate italic">{professional?.name || event.resource.professional}</p>
+    </div>
+  );
+};
+
 // --- Componente Principal ---
 export default function Appointments() {
   const { user } = useSupabaseAuth();
@@ -84,12 +106,13 @@ export default function Appointments() {
   } = useAppStore();
 
   // --- Estados do Componente ---
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentType | null>(null);
-  const [view, setView] = useState<View>(Views.WEEK);
+  const [view, setView] = useState<View>(isMobile ? Views.DAY : Views.WEEK);
   const [date, setDate] = useState(new Date());
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
 
@@ -123,6 +146,10 @@ export default function Appointments() {
       fetchAppointments(user.id); 
     }
   }, [user, fetchAppointments]);
+  
+  useEffect(() => {
+    setView(isMobile ? Views.DAY : Views.WEEK);
+  }, [isMobile]);
 
   useEffect(() => {
     if (watchedServiceId && services.length > 0) {
@@ -164,27 +191,26 @@ export default function Appointments() {
     return appointments.filter(app => app.professional_id === selectedProfessionalId);
   }, [appointments, selectedProfessionalId]);
 
-  const calendarEvents: CalendarEvent[] = useMemo(() => filteredAppointments.map((appointment: AppointmentType) => {
-    const start = new Date(appointment.appointment_date);
-    const end = new Date(appointment.end_date); 
-    const clientName = clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name;
-    const serviceName = services.find(s => s.id === appointment.service_id)?.name || appointment.service;
-    
-    // LINHA ADICIONADA: Busca o nome do profissional
-    const professionalName = professionals.find(p => p.id === appointment.professional_id)?.name || appointment.professional;
-
-    return {
+  const calendarEvents: CalendarEvent[] = useMemo(() => filteredAppointments.map((appointment: AppointmentType) => ({
       id: appointment.id!,
-      // LINHA MODIFICADA: Adiciona o nome do profissional ao título
-      title: `${clientName} - ${serviceName} - ${professionalName}`,
-      start,
-      end,
+      title: `${clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name}`,
+      start: new Date(appointment.appointment_date),
+      end: new Date(appointment.end_date),
       resource: appointment,
-    };
-    // MODIFICADO: Adiciona 'professionals' à lista de dependências
-  }), [filteredAppointments, clients, services, professionals]);
+  })), [filteredAppointments, clients]);
 
   // --- Manipuladores de Eventos ---
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => {
+      if (view === Views.DAY) setDate(moment(date).add(1, 'day').toDate());
+    },
+    onSwipedRight: () => {
+      if (view === Views.DAY) setDate(moment(date).subtract(1, 'day').toDate());
+    },
+    preventScrollOnSwipe: true,
+    trackMouse: true,
+  });
+
   const onSubmit = async (data: AppointmentFormData) => {
     if (!user) return;
     
@@ -195,10 +221,8 @@ export default function Appointments() {
     const conflictingAppointment = appointments.find(app => {
         if (editingAppointment && app.id === editingAppointment.id) return false;
         if (app.professional_id !== professionalId) return false;
-
         const existingStart = moment(app.appointment_date);
         const existingEnd = moment(app.end_date);
-        
         return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
     });
 
@@ -238,7 +262,6 @@ export default function Appointments() {
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar agendamento:', (error as Error).message);
       showError("Não foi possível salvar", "Verifique os dados e tente novamente.");
     }
   };
@@ -257,7 +280,6 @@ export default function Appointments() {
       setIsConfirmModalOpen(false);
       setAppointmentToDelete(null);
     } catch (err: any) {
-      console.error('Erro ao excluir:', err.message);
       showError("Falha ao remover agendamento.");
     } finally {
       setIsDeleting(false);
@@ -297,27 +319,16 @@ export default function Appointments() {
     setIsModalOpen(true);
   }, [reset]);
   
-  // NOVA FUNÇÃO: Define o estilo do evento com base na cor do profissional.
   const eventPropGetter = useCallback(
     (event: CalendarEvent) => {
-      const professional = professionals.find(
-        (p: ProfessionalType) => p.id === event.resource.professional_id
-      );
+      const professional = professionals.find(p => p.id === event.resource.professional_id);
       // @ts-ignore
       const professionalColor = professional?.color;
-
-      // Não aplica a cor na visualização "Agenda"
       if (professionalColor && view !== 'agenda') {
-        return {
-          style: {
-            backgroundColor: professionalColor,
-            borderColor: professionalColor,
-          },
-        };
+        return { style: { backgroundColor: professionalColor, borderColor: professionalColor } };
       }
       return {};
-    },
-    [professionals, view] // Depende da lista de profissionais e da visualização atual
+    }, [professionals, view]
   );
 
   if (loading.clients || loading.professionals || loading.services || loading.businessHours) {
@@ -326,7 +337,7 @@ export default function Appointments() {
 
   return (
     <Layout>
-      <div className="px-4 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8 pb-24 sm:pb-8">
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Agendamentos</h1>
@@ -343,14 +354,14 @@ export default function Appointments() {
                 >
                   <option value="">Todos os Profissionais</option>
                   {professionals.map((prof: ProfessionalType) => (
-                    <option key={prof.id} value={prof.id}>{prof.name}</option>
+                    <option key={prof.id} value={prof.id!}>{prof.name}</option>
                   ))}
                 </select>
              </div>
             <button
               type="button"
               onClick={() => handleSelectSlot({ start: new Date() })}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-pink-600 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+              className="hidden sm:inline-flex items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-pink-600 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
             >
               <Plus className="w-4 h-4 mr-2" />
               Agendar
@@ -358,9 +369,9 @@ export default function Appointments() {
           </div>
         </div>
 
-        <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative">
+        <div {...swipeHandlers} className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-2 sm:p-6 relative">
           {loading.appointments && <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10"><LoadingSpinner /></div>}
-          <div style={{ height: '600px' }}>
+          <div style={{ height: '70vh' }}>
             <BigCalendar
               localizer={localizer}
               events={calendarEvents}
@@ -374,7 +385,8 @@ export default function Appointments() {
               onSelectEvent={handleSelectEvent}
               selectable
               culture='pt-br'
-              eventPropGetter={eventPropGetter} // <-- ADICIONADO AQUI
+              eventPropGetter={eventPropGetter}
+              components={{ event: CustomEvent }}
               messages={{
                 next: 'Próximo',
                 previous: 'Anterior',
@@ -396,15 +408,15 @@ export default function Appointments() {
                 monthHeaderFormat: 'MMMM [de] YYYY',
                 dayHeaderFormat: 'dddd, D [de] MMMM',
                 agendaHeaderFormat: ({ start, end }, culture, local) => 
-                  local.format(start, 'dddd, DD [de] MMMM', culture),
+                  local!.format(start, 'dddd, DD [de] MMMM', culture),
                 agendaDateFormat: 'ddd DD [de] MMM',
                 dayRangeHeaderFormat: ({ start, end }, culture, local) => 
-                  `${local.format(start, 'DD/MM', culture)} - ${local.format(end, 'DD/MM', culture)}`,
+                  `${local!.format(start, 'DD/MM', culture)} - ${local!.format(end, 'DD/MM', culture)}`,
                 agendaTimeFormat: 'HH:mm',
                 agendaTimeRangeFormat: ({ start, end }, culture, local) => 
-                  `${local.format(start, 'HH:mm', culture)} – ${local.format(end, 'HH:mm', culture)}`,
+                  `${local!.format(start, 'HH:mm', culture)} – ${local!.format(end, 'HH:mm', culture)}`,
                 eventTimeRangeFormat: ({ start, end }, culture, local) => 
-                  `${local.format(start, 'HH:mm', culture)} - ${local.format(end, 'HH:mm', culture)}`,
+                  `${local!.format(start, 'HH:mm', culture)} - ${local!.format(end, 'HH:mm', culture)}`,
               }}
               min={minTime}
               max={maxTime}
@@ -433,7 +445,7 @@ export default function Appointments() {
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
                         >
                           <option value="">Selecione um cliente</option>
-                          {clients.map((client) => ( <option key={client.id} value={client.id}>{client.name}</option> ))}
+                          {clients.map((client) => ( <option key={client.id} value={client.id!}>{client.name}</option> ))}
                         </select>
                         {errors.client_id && <p className="mt-1 text-sm text-red-600">{errors.client_id.message}</p>}
                       </div>
@@ -444,7 +456,7 @@ export default function Appointments() {
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
                         >
                           <option value="">Selecione um profissional</option>
-                          {professionals.map((prof) => (<option key={prof.id} value={prof.id}>{prof.name}</option>))}
+                          {professionals.map((prof) => (<option key={prof.id} value={prof.id!}>{prof.name}</option>))}
                         </select>
                         {errors.professional_id && <p className="mt-1 text-sm text-red-600">{errors.professional_id.message}</p>}
                       </div>
@@ -455,7 +467,7 @@ export default function Appointments() {
                           className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
                         >
                           <option value="">Selecione um serviço</option>
-                          {services.map((service) => (<option key={service.id} value={service.id}>{service.name}</option>))}
+                          {services.map((service) => (<option key={service.id} value={service.id!}>{service.name}</option>))}
                         </select>
                         {errors.service_id && <p className="mt-1 text-sm text-red-600">{errors.service_id.message}</p>}
                       </div>
@@ -513,6 +525,18 @@ export default function Appointments() {
           isLoading={isDeleting}
         />
       </div>
+      
+      {isMobile && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => handleSelectSlot({ start: new Date() })}
+            className="bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-full p-4 shadow-lg hover:scale-110 active:scale-100 transition-transform duration-200"
+            aria-label="Novo Agendamento"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
+      )}
     </Layout>
   );
 }
