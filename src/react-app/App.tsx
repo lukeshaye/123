@@ -4,7 +4,6 @@ import { Suspense, lazy } from "react";
 import HomePage from "./pages/Home";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoadingSpinner from "./components/LoadingSpinner";
-import PWAStatus from "./components/PWAStatus";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { ToastContainer } from "./components/Toast";
@@ -29,7 +28,6 @@ function AppRoutes() {
 
   return (
     <>
-      <PWAStatus />
       <Router>
         <Routes>
           <Route path="/" element={<HomePage />} />

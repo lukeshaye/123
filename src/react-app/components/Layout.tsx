@@ -38,7 +38,7 @@ const navigation = [
  */
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user } = useSupabaseAuth(); 
+  const { user } = useSupabaseAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -108,8 +108,8 @@ export default function Layout({ children }: LayoutProps) {
                     alt="Avatar do utilizador"
                   />
                 </div>
-                <div className="ml-3">
-                  <p className="text-base font-medium text-gray-700">
+                <div className="ml-3 min-w-0">
+                  <p className="truncate text-base font-medium text-gray-700" title={userName}>
                     {userName}
                   </p>
                   <button
@@ -168,8 +168,8 @@ export default function Layout({ children }: LayoutProps) {
                     alt="Avatar do utilizador"
                   />
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-700">
+                <div className="ml-3 min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-700" title={userName}>
                     {userName}
                   </p>
                   <button
