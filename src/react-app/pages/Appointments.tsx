@@ -170,14 +170,19 @@ export default function Appointments() {
     const clientName = clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name;
     const serviceName = services.find(s => s.id === appointment.service_id)?.name || appointment.service;
     
+    // LINHA ADICIONADA: Busca o nome do profissional
+    const professionalName = professionals.find(p => p.id === appointment.professional_id)?.name || appointment.professional;
+
     return {
       id: appointment.id!,
-      title: `${clientName} - ${serviceName}`,
+      // LINHA MODIFICADA: Adiciona o nome do profissional ao título
+      title: `${clientName} - ${serviceName} - ${professionalName}`,
       start,
       end,
       resource: appointment,
     };
-  }), [filteredAppointments, clients, services]);
+    // MODIFICADO: Adiciona 'professionals' à lista de dependências
+  }), [filteredAppointments, clients, services, professionals]);
 
   // --- Manipuladores de Eventos ---
   const onSubmit = async (data: AppointmentFormData) => {
