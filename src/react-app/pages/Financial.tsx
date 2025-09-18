@@ -79,6 +79,51 @@ export default function Financial() {
   });
   
   // --- Funções de Busca de Dados (Agora baseadas no mês) ---
+  const fetchEntries = useCallback(async (date: Date) => {
+    if (!user) return [];
+    
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+    const { data, error } = await supabase
+      .from('financial_entries')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('entry_date', startOfMonth.toISOString().split('T')[0])
+      .lte('entry_date', endOfMonth.toISOString().split('T')[0])
+      .order('entry_date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }, [user]);
+  
+  const fetchKPIs = useCallback(async (date: Date) => {
+    if (!user) return { monthlyRevenue: 0, monthlyExpenses: 0 };
+    
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+    const { data: monthlyEntries, error } = await supabase
+      .from('financial_entries')
+      .select('amount, type')
+      .eq('user_id', user.id)
+      .gte('entry_date', startOfMonth.toISOString().split('T')[0])
+      .lte('entry_date', endOfMonth.toISOString().split('T')[0]);
+
+    if (error) throw error;
+
+    const kpisResult = (monthlyEntries || []).reduce((acc: { monthlyRevenue: number; monthlyExpenses: number }, entry: { amount: number; type: string }) => {
+        if (entry.type === 'receita') {
+          acc.monthlyRevenue += entry.amount;
+        } else if (entry.type === 'despesa') {
+          acc.monthlyExpenses += entry.amount;
+        }
+        return acc;
+      }, { monthlyRevenue: 0, monthlyExpenses: 0 });
+
+    return kpisResult;
+  }, [user]);
+
   const fetchEntriesAndKPIs = useCallback(async (date: Date) => {
     if (!user) return;
     setLoading(true);
@@ -104,52 +149,7 @@ export default function Financial() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
-
-  const fetchEntries = async (date: Date) => {
-    if (!user) return [];
-    
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
-    const { data, error } = await supabase
-      .from('financial_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('entry_date', startOfMonth.toISOString().split('T')[0])
-      .lte('entry_date', endOfMonth.toISOString().split('T')[0])
-      .order('entry_date', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  };
-  
-  const fetchKPIs = async (date: Date) => {
-    if (!user) return { monthlyRevenue: 0, monthlyExpenses: 0 };
-    
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
-    const { data: monthlyEntries, error } = await supabase
-      .from('financial_entries')
-      .select('amount, type')
-      .eq('user_id', user.id)
-      .gte('entry_date', startOfMonth.toISOString().split('T')[0])
-      .lte('entry_date', endOfMonth.toISOString().split('T')[0]);
-
-    if (error) throw error;
-
-    const kpisResult = (monthlyEntries || []).reduce((acc: { monthlyRevenue: number; monthlyExpenses: number }, entry: { amount: number; type: string }) => {
-        if (entry.type === 'receita') {
-          acc.monthlyRevenue += entry.amount;
-        } else if (entry.type === 'despesa') {
-          acc.monthlyExpenses += entry.amount;
-        }
-        return acc;
-      }, { monthlyRevenue: 0, monthlyExpenses: 0 });
-
-    return kpisResult;
-  };
+  }, [user, fetchEntries, fetchKPIs, showError]);
   
   // Efeito que busca os dados quando o usuário ou a data mudam
   useEffect(() => {
@@ -247,18 +247,46 @@ export default function Financial() {
     const doc = new jsPDF();
     const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
     doc.text(`Relatório Financeiro - ${monthName}`, 14, 16);
+  
+    const tableBody = entries.map((e: FinancialEntryType) => [
+      formatDate(e.entry_date),
+      e.description,
+      e.type === 'receita' ? 'Receita' : 'Despesa',
+      e.entry_type === 'pontual' ? 'Pontual' : 'Fixa',
+      formatCurrency(e.amount)
+    ]);
+  
     autoTable(doc, {
-        startY: 20,
-        head: [['Data', 'Descrição', 'Tipo', 'Valor']],
-        body: entries.map((e: FinancialEntryType) => [
-            formatDate(e.entry_date),
-            e.description,
-            e.type === 'receita' ? 'Receita' : 'Despesa',
-            formatCurrency(e.amount)
-        ]),
+      startY: 20,
+      head: [['Data', 'Descrição', 'Tipo', 'Frequência', 'Valor']],
+      body: tableBody,
+      didParseCell: function (data) {
+        // Colore o texto do valor baseado no tipo de entrada
+        if (data.column.index === 4) { // Coluna 'Valor'
+          if (data.cell.raw && data.row.raw[2] === 'Receita') {
+            data.cell.styles.textColor = [0, 128, 0]; // Verde
+          } else if (data.cell.raw && data.row.raw[2] === 'Despesa') {
+            data.cell.styles.textColor = [255, 0, 0]; // Vermelho
+          }
+        }
+      },
+      didDrawPage: function (data) {
+        // Adiciona o rodapé com os totais
+        const finalY = data.cursor?.y;
+        if (finalY) {
+            doc.setFontSize(10);
+            doc.text(`Receita Total: ${formatCurrency(kpis.monthlyRevenue)}`, 14, finalY + 10);
+            doc.text(`Despesa Total: ${formatCurrency(kpis.monthlyExpenses)}`, 14, finalY + 15);
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Lucro Líquido: ${formatCurrency(kpis.netProfit)}`, 14, finalY + 22);
+        }
+      },
     });
-    doc.save(`relatorio_financeiro_${currentDate.getFullYear()}_${currentDate.getMonth()+1}.pdf`);
+  
+    doc.save(`relatorio_financeiro_${currentDate.getFullYear()}_${currentDate.getMonth() + 1}.pdf`);
   };
+  
 
   const handleExportCSV = () => {
     const csvContent = [
