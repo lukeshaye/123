@@ -19,7 +19,8 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  File as FileIcon // Ícone para CSV
 } from 'lucide-react';
 import type { FinancialEntryType } from '../../shared/types';
 import { CreateFinancialEntrySchema } from '../../shared/types';
@@ -61,6 +62,10 @@ export default function Financial() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>('all');
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'pontual' | 'fixa'>('all');
+  
+  // NOVO ESTADO: Controla a abertura do menu FAB
+  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
+
 
   const [kpis, setKpis] = useState({
     monthlyRevenue: 0,
@@ -294,7 +299,7 @@ export default function Financial() {
               <FileText className="w-4 h-4 mr-2" /> Exportar PDF
             </button>
             <button type="button" onClick={handleExportCSV} className="hidden lg:inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
-              <FileText className="w-4 h-4 mr-2" /> Exportar CSV
+              <FileIcon className="w-4 h-4 mr-2" /> Exportar CSV
             </button>
             <button type="button" onClick={() => setIsModalOpen(true)} className="hidden sm:inline-flex items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-pink-600 hover:to-violet-600">
               <Plus className="w-4 h-4 mr-2" /> Nova Entrada
@@ -382,12 +387,82 @@ export default function Financial() {
         </div>
       </div>
       
-      {/* Botão de Ação Flutuante para Mobile */}
+      {/* --- INÍCIO: MENU FAB CORRIGIDO PARA MOBILE --- */}
       <div className="sm:hidden fixed bottom-6 right-6 z-40">
-          <button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-full p-4 shadow-lg hover:scale-110 active:scale-100 transition-transform duration-200" aria-label="Nova Entrada">
-              <Plus className="w-6 h-6" />
-          </button>
+        {/* Backdrop */}
+        {isFabMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25"
+            onClick={() => setIsFabMenuOpen(false)}
+            aria-hidden="true"
+          ></div>
+        )}
+
+        {/* Container para todos os elementos FAB */}
+        <div className="relative flex flex-col-reverse items-end gap-y-3">
+        
+            {/* Botão FAB Principal */}
+            <button 
+                onClick={() => setIsFabMenuOpen(!isFabMenuOpen)} 
+                className="relative z-10 bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-full p-4 shadow-lg hover:scale-110 active:scale-100 transition-all duration-300"
+                aria-label={isFabMenuOpen ? "Fechar menu de ações" : "Abrir menu de ações"}
+                aria-expanded={isFabMenuOpen}
+            >
+                <Plus className={`w-6 h-6 transition-transform duration-300 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
+            </button>
+
+            {/* Container para as opções do menu */}
+            <div 
+                className={`flex flex-col items-end gap-y-3 transition-all duration-300 ease-in-out ${
+                    isFabMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+                }`}
+            >
+                {/* Ação: Nova Entrada */}
+                <div className="flex items-center gap-x-3">
+                    <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
+                        Nova Entrada
+                    </span>
+                    <button
+                        onClick={() => { setIsModalOpen(true); setIsFabMenuOpen(false); }}
+                        className="bg-white text-gray-800 rounded-full p-3 shadow-lg hover:bg-gray-100 transition-colors"
+                        aria-label="Nova Entrada"
+                    >
+                        <Plus className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                {/* Ação: Exportar PDF */}
+                <div className="flex items-center gap-x-3">
+                     <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
+                        Exportar PDF
+                    </span>
+                    <button
+                        onClick={() => { handleExportPDF(); setIsFabMenuOpen(false); }}
+                        className="bg-white text-gray-800 rounded-full p-3 shadow-lg hover:bg-gray-100 transition-colors"
+                        aria-label="Exportar PDF"
+                    >
+                        <FileText className="w-5 h-5" />
+                    </button>
+                </div>
+                
+                {/* Ação: Exportar CSV */}
+                <div className="flex items-center gap-x-3">
+                    <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
+                        Exportar CSV
+                    </span>
+                    <button
+                        onClick={() => { handleExportCSV(); setIsFabMenuOpen(false); }}
+                        className="bg-white text-gray-800 rounded-full p-3 shadow-lg hover:bg-gray-100 transition-colors"
+                        aria-label="Exportar CSV"
+                    >
+                        <FileIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
+        </div>
       </div>
+      {/* --- FIM: MENU FAB CORRIGIDO PARA MOBILE --- */}
+
 
       {/* Modal de Adicionar/Editar */}
       {isModalOpen && (
