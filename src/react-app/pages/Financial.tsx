@@ -30,7 +30,7 @@ import autoTable from 'jspdf-autotable';
 // --- Interfaces e Tipos ---
 interface FinancialFormData {
     description: string;
-    amount: number; 
+    amount: number | null; 
     type: 'receita' | 'despesa';
     entry_type: 'pontual' | 'fixa';
     entry_date: string;
@@ -38,7 +38,7 @@ interface FinancialFormData {
 
 const defaultFormValues: FinancialFormData = {
     description: '',
-    amount: 0,
+    amount: null,
     type: 'receita',
     entry_type: 'pontual',
     entry_date: new Date().toISOString().split('T')[0],
@@ -171,7 +171,7 @@ export default function Financial() {
     setCurrentDate(new Date());
   };
 
-  const onSubmit = async (formData: FinancialFormData) => {
+  const onSubmit = async (formData: Omit<FinancialFormData, 'amount'> & { amount: number }) => {
     if (!user) return;
     setError(null);
     
@@ -485,7 +485,7 @@ export default function Financial() {
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
               <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleCloseModal}></div>
               <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <form onSubmit={handleSubmit(onSubmit)}>
+                <form onSubmit={handleSubmit(onSubmit as any)}>
                   <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-medium text-gray-900">{editingEntry ? 'Editar Entrada' : 'Nova Entrada'}</h3>
