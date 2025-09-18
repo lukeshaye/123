@@ -25,7 +25,8 @@ interface WeeklyEarning {
  */
 export default function Dashboard() {
   const { user } = useSupabaseAuth();
-  const { clients } = useAppStore();
+  // MODIFICADO: Adicionado 'fetchClients' para carregar os clientes.
+  const { clients, fetchClients } = useAppStore();
   const { showSuccess, showError } = useToastHelpers();
 
   // --- Estados do Componente ---
@@ -38,8 +39,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      // MODIFICADO: Carrega a lista de clientes ao iniciar o dashboard.
+      fetchClients(user.id);
     }
-  }, [user]);
+  // MODIFICADO: Adicionado 'fetchClients' como dependência do useEffect.
+  }, [user, fetchClients]);
 
   /**
    * Orquestra todas as buscas de dados para o dashboard.
@@ -141,6 +145,9 @@ export default function Dashboard() {
    */
   const handleAttendanceChange = async (appointment: AppointmentType, hasAttended: boolean) => {
     if (!user) return;
+
+    // MODIFICADO: Usa a lista de clientes atual para obter o nome mais recente.
+    const clientName = clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name;
     
     // 1. Atualiza o status de presença no agendamento
     const { error: updateError } = await supabase
@@ -159,7 +166,7 @@ export default function Dashboard() {
         .from('financial_entries')
         .insert({
           user_id: user.id,
-          description: `Serviço: ${appointment.service} - Cliente: ${appointment.client_name}`,
+          description: `Serviço: ${appointment.service} - Cliente: ${clientName}`,
           amount: appointment.price,
           type: 'receita',
           entry_type: 'pontual',
@@ -182,7 +189,7 @@ export default function Dashboard() {
         .from('financial_entries')
         .delete()
         .eq('user_id', user.id)
-        .eq('description', `Serviço: ${appointment.service} - Cliente: ${appointment.client_name}`)
+        .eq('description', `Serviço: ${appointment.service} - Cliente: ${clientName}`)
         .eq('is_virtual', true);
 
       if (deleteError) {
@@ -321,7 +328,8 @@ export default function Dashboard() {
                         />
                         <label htmlFor={`attended-${appointment.id}`} className="ml-3 flex-1">
                           <p className="text-sm font-medium text-gray-900">
-                            {formatTime(appointment.appointment_date)} - {clients.find(c => c.id === appointment.client_id)?.name || 'Cliente'}
+                            {/* MODIFICADO: Usa a lista de clientes atual para exibir o nome. */}
+                            {formatTime(appointment.appointment_date)} - {clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name}
                           </p>
                           <p className="text-sm text-gray-600 mt-1">
                             {appointment.service} • {appointment.professional} • {formatCurrency(appointment.price)}
