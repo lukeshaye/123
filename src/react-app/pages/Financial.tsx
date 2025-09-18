@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
@@ -7,13 +7,27 @@ import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
-import { DollarSign, TrendingUp, TrendingDown, Plus, Edit, Trash2, X, FileText, AlertCircle } from 'lucide-react';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  TrendingDown, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  X, 
+  FileText, 
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon
+} from 'lucide-react';
 import type { FinancialEntryType } from '../../shared/types';
 import { CreateFinancialEntrySchema } from '../../shared/types';
 import { formatCurrency, formatDate } from '../utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// --- Interfaces e Tipos ---
 interface FinancialFormData {
     description: string;
     amount: number; 
@@ -30,10 +44,12 @@ const defaultFormValues: FinancialFormData = {
     entry_date: new Date().toISOString().split('T')[0],
 };
 
+// --- Componente Principal ---
 export default function Financial() {
   const { user } = useSupabaseAuth(); 
   const { showSuccess, showError } = useToastHelpers();
   
+  // --- Estados ---
   const [entries, setEntries] = useState<FinancialEntryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,6 +58,10 @@ export default function Financial() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<FinancialEntryType | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // NOVO: Estado para controlar o mês de visualização
+  const [currentDate, setCurrentDate] = useState(new Date());
+
   const [kpis, setKpis] = useState({
     monthlyRevenue: 0,
     monthlyExpenses: 0,
@@ -58,20 +78,15 @@ export default function Financial() {
     defaultValues: defaultFormValues,
   });
   
-  useEffect(() => {
-    if (user) {
-      fetchEntriesAndKPIs();
-    }
-  }, [user]);
-
-  const fetchEntriesAndKPIs = async () => {
+  // --- Funções de Busca de Dados (Agora baseadas no mês) ---
+  const fetchEntriesAndKPIs = useCallback(async (date: Date) => {
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
       const [entriesData, kpisData] = await Promise.all([
-        fetchEntries(),
-        fetchKPIs()
+        fetchEntries(date),
+        fetchKPIs(date)
       ]);
       
       if (entriesData) setEntries(entriesData);
@@ -84,30 +99,36 @@ export default function Financial() {
 
     } catch (err: any) {
       setError("Falha ao carregar dados financeiros. Tente novamente mais tarde.");
+      showError("Erro ao carregar dados", err.message);
       console.error("Erro ao carregar dados financeiros:", err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const fetchEntries = async () => {
+  const fetchEntries = async (date: Date) => {
     if (!user) return [];
+    
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
     const { data, error } = await supabase
       .from('financial_entries')
       .select('*')
       .eq('user_id', user.id)
+      .gte('entry_date', startOfMonth.toISOString().split('T')[0])
+      .lte('entry_date', endOfMonth.toISOString().split('T')[0])
       .order('entry_date', { ascending: false });
 
     if (error) throw error;
     return data || [];
   };
   
-  const fetchKPIs = async () => {
-     if (!user) return { monthlyRevenue: 0, monthlyExpenses: 0 };
+  const fetchKPIs = async (date: Date) => {
+    if (!user) return { monthlyRevenue: 0, monthlyExpenses: 0 };
     
-    const currentDate = new Date();
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
     const { data: monthlyEntries, error } = await supabase
       .from('financial_entries')
@@ -129,6 +150,26 @@ export default function Financial() {
 
     return kpisResult;
   };
+  
+  // Efeito que busca os dados quando o usuário ou a data mudam
+  useEffect(() => {
+    if (user) {
+      fetchEntriesAndKPIs(currentDate);
+    }
+  }, [user, currentDate, fetchEntriesAndKPIs]);
+
+  // --- Manipuladores de Eventos ---
+  const handlePreviousMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+  
+  const handleNextMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const handleCurrentMonth = () => {
+    setCurrentDate(new Date());
+  };
 
   const onSubmit = async (formData: FinancialFormData) => {
     if (!user) return;
@@ -148,7 +189,7 @@ export default function Financial() {
         showSuccess('Entrada adicionada!');
       }
       
-      await fetchEntriesAndKPIs();
+      await fetchEntriesAndKPIs(currentDate);
       handleCloseModal();
     } catch (err: any) {
       setError("Erro ao salvar a entrada financeira. Verifique os dados e tente novamente.");
@@ -171,7 +212,7 @@ export default function Financial() {
       showSuccess('Entrada removida!');
       setIsConfirmModalOpen(false);
       setEntryToDelete(null);
-      await fetchEntriesAndKPIs();
+      await fetchEntriesAndKPIs(currentDate);
     } catch (error) {
       console.error('Erro ao excluir entrada:', (error as Error).message);
       showError('Erro ao remover entrada.');
@@ -201,10 +242,11 @@ export default function Financial() {
     reset(defaultFormValues);
     setError(null);
   };
-
+  
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    doc.text("Relatório Financeiro - SalonFlow", 14, 16);
+    const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+    doc.text(`Relatório Financeiro - ${monthName}`, 14, 16);
     autoTable(doc, {
         startY: 20,
         head: [['Data', 'Descrição', 'Tipo', 'Valor']],
@@ -215,7 +257,7 @@ export default function Financial() {
             formatCurrency(e.amount)
         ]),
     });
-    doc.save('relatorio_financeiro.pdf');
+    doc.save(`relatorio_financeiro_${currentDate.getFullYear()}_${currentDate.getMonth()+1}.pdf`);
   };
 
   const handleExportCSV = () => {
@@ -233,16 +275,18 @@ export default function Financial() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'relatorio_financeiro.csv');
+    link.setAttribute('download', `relatorio_financeiro_${currentDate.getFullYear()}_${currentDate.getMonth()+1}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
   
-  if (loading) {
+  if (loading && !isModalOpen) {
     return <Layout><LoadingSpinner /></Layout>;
   }
+
+  const formattedMonth = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
   return (
     <Layout>
@@ -278,6 +322,22 @@ export default function Financial() {
               Nova Entrada
             </button>
           </div>
+        </div>
+        
+        {/* --- NOVO: Controles de Navegação de Mês --- */}
+        <div className="mt-6 flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
+            <button onClick={handlePreviousMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+            </button>
+            <div className="text-center">
+                <h2 className="text-lg font-semibold text-gray-800 capitalize">{formattedMonth}</h2>
+                <button onClick={handleCurrentMonth} className="text-sm text-pink-600 hover:underline">
+                    Mês Atual
+                </button>
+            </div>
+            <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+            </button>
         </div>
         
         {error && !isModalOpen && (
@@ -344,18 +404,18 @@ export default function Financial() {
         <div className="mt-8">
           <div className="bg-white shadow-sm rounded-lg border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Lançamentos Recentes</h3>
+              <h3 className="text-lg font-medium text-gray-900">Lançamentos do Mês</h3>
             </div>
             {entries.length === 0 ? (
               <div className="text-center py-12">
-                <DollarSign className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma entrada financeira</h3>
+                <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma entrada neste mês</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Comece registrando uma receita ou despesa.
+                  Comece registrando uma receita ou despesa para este período.
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden">
+              <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -370,7 +430,7 @@ export default function Financial() {
                     {entries.map((entry) => (
                       <tr key={entry.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(entry.entry_date)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.description}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{entry.description}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${entry.type === 'receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {entry.type === 'receita' ? 'Receita' : 'Despesa'}
@@ -379,9 +439,9 @@ export default function Financial() {
                         <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${entry.type === 'receita' ? 'text-green-600' : 'text-red-600'}`}>
                           {entry.type === 'receita' ? '+' : '-'}{formatCurrency(entry.amount)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button onClick={() => handleEditEntry(entry)} className="text-indigo-600 hover:text-indigo-900 mr-3"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => handleDeleteClick(entry)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4" /></button>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                          <button onClick={() => handleEditEntry(entry)} className="text-indigo-600 hover:text-indigo-900 inline-block"><Edit className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteClick(entry)} className="text-red-600 hover:text-red-900 inline-block"><Trash2 className="w-4 h-4" /></button>
                         </td>
                       </tr>
                     ))}
