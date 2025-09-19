@@ -15,51 +15,9 @@ import 'moment/locale/pt-br';
 import type { AppointmentType, ClientType, ProfessionalType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
 
-// --- COMPONENTE DE ESTILOS ---
-const CalendarStyles = () => (
-  <style>{`
-    /* Base styles from react-day-picker/dist/style.css */
-    .rdp {
-      --rdp-cell-size: 40px;
-      --rdp-accent-color: #ec4899;
-      --rdp-background-color: #fce7f3;
-      --rdp-outline: 2px solid var(--rdp-accent-color);
-      --rdp-outline-selected: 3px solid var(--rdp-accent-color);
-      margin: 1em auto;
-      font-family: 'Inter', sans-serif;
-    }
-    .rdp-vhidden {
-        box-sizing: border-box !important; padding: 0 !important; margin: 0 !important; height: 1px !important; width: 1px !important;
-        overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; clip-path: inset(50%) !important;
-        border: 0 !important; position: absolute !important; white-space: nowrap !important;
-    }
-    .rdp-caption { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.5em; text-align: left; }
-    .rdp-caption_label { font-size: .875em; font-weight: 700; color: #374151; z-index: 1; }
-    .rdp-nav { display: flex; align-items: center; }
-    .rdp-nav_button {
-        display: inline-flex; align-items: center; justify-content: center; padding: .25em;
-        width: var(--rdp-cell-size); height: var(--rdp-cell-size); border-radius: 100%;
-        background-color: transparent; box-shadow: none; border: none; cursor: pointer; color: #4b5563;
-    }
-    .rdp-table { margin: 0; max-width: calc(var(--rdp-cell-size) * 7); border-collapse: collapse; }
-    .rdp-head_row, .rdp-row { height: var(--rdp-cell-size); }
-    .rdp-head_cell, .rdp-cell { padding: 0; width: var(--rdp-cell-size); height: var(--rdp-cell-size); text-align: center; box-sizing: border-box; }
-    .rdp-head_cell { font-size: .75em; font-weight: 700; color: #6b7280; }
-    .rdp-button {
-        width: 100%; height: 100%; border: 2px solid transparent; border-radius: 100%;
-        background-color: transparent; font-family: inherit; font-size: inherit;
-        font-weight: 400; color: inherit; cursor: pointer;
-    }
-    .rdp-button:focus-visible:not([disabled]) { z-index: 2; border: none; outline: var(--rdp-outline); }
-    .rdp-day_today { font-weight: bold; color: var(--rdp-accent-color); }
-    .rdp-day_today:not(.rdp-day_selected) { background-color: transparent !important; border: 1px solid var(--rdp-accent-color) !important; }
-    .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { color: #fff; background-color: var(--rdp-accent-color); opacity: 1; }
-    .rdp-day_selected:focus-visible{ outline: var(--rdp-outline-selected); }
-    .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: var(--rdp-background-color); }
-    .rdp-day_outside { opacity: .25; }
-    .rdp-day_disabled { opacity: .25; cursor: default; }
-  `}</style>
-);
+// Importa os novos estilos para o DayPicker
+import './day-picker-styles.css';
+
 
 // --- Definição de Tipos ---
 interface AppointmentFormData {
@@ -264,7 +222,6 @@ export default function Appointments() {
 
   return (
     <Layout>
-      <CalendarStyles />
       <div className="px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
@@ -297,7 +254,10 @@ export default function Appointments() {
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* --- NOVO LAYOUT DE GRELHA --- */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 lg:gap-x-12">
+          
+          {/* Coluna do Calendário (lateral) */}
           <div className="lg:col-span-4 xl:col-span-3">
             <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                <DayPicker
@@ -311,7 +271,8 @@ export default function Appointments() {
             </div>
           </div>
 
-          <div className="lg:col-span-8 xl:col-span-9">
+          {/* Coluna da Agenda (principal) */}
+          <div className="lg:col-span-8 xl:col-span-9 mt-8 lg:mt-0">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[60vh]">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                  <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
@@ -477,4 +438,3 @@ export default function Appointments() {
     </Layout>
   );
 }
-
