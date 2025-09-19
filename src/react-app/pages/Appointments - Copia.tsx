@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
@@ -8,9 +8,8 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DayPicker, CaptionProps, useNavigation } from 'react-day-picker';
+import { DayPicker } from 'react-day-picker';
 import { ptBR } from 'date-fns/locale';
-import { format } from 'date-fns';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import type { AppointmentType } from '../../shared/types';
@@ -39,37 +38,6 @@ const defaultFormValues: Partial<AppointmentFormData> = {
   end_date: '',
   attended: false,
 };
-
-function CalendarCaption(props: CaptionProps) {
-  const { goToMonth, nextMonth, previousMonth } = useNavigation();
-  const monthName = format(props.displayMonth, 'MMMM yyyy', { locale: ptBR });
-  const capitalizedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-  return (
-    <div className="flex items-center justify-between px-1 pt-1 mb-4 rdp-caption">
-      <button
-        disabled={!previousMonth}
-        onClick={() => previousMonth && goToMonth(previousMonth)}
-        className="rdp-nav_button"
-        aria-label="Mês anterior"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <h2 className="text-base font-bold text-gray-900">
-        {capitalizedMonthName}
-      </h2>
-      <button
-        disabled={!nextMonth}
-        onClick={() => nextMonth && goToMonth(nextMonth)}
-        className="rdp-nav_button"
-        aria-label="Próximo mês"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-    </div>
-  );
-}
-
 
 // --- Componente Principal ---
 export default function Appointments() {
@@ -275,7 +243,6 @@ export default function Appointments() {
   return (
     <Layout>
       <div className="px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
-        {/* ... (código do cabeçalho da página principal - inalterado) ... */}
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
@@ -317,7 +284,6 @@ export default function Appointments() {
           </div>
         </div>
         
-        {/* ... (código da timeline de agendamentos - inalterado) ... */}
         <div className="mt-8">
           <div className="lg:col-span-12">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[60vh]">
@@ -389,40 +355,25 @@ export default function Appointments() {
           </div>
         </div>
 
-        {/* Modal do Calendário (ATUALIZADO) */}
+        {/* Modal do Calendário */}
         {isCalendarOpen && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-60 backdrop-blur-sm calendar-modal-wrapper"
+            className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4"
             onClick={() => setIsCalendarOpen(false)}
           >
             <div 
-              className="bg-white p-6 rounded-2xl shadow-xl transform transition-all sm:w-full sm:max-w-md"
-              onClick={(e) => e.stopPropagation()}
+              className="bg-white p-4 rounded-lg shadow-xl transform transition-all sm:w-full sm:max-w-sm"
+              onClick={(e) => e.stopPropagation()} // Impede que o clique dentro do modal o feche
             >
-               <DayPicker
-    mode="single"
-    selected={tempSelectedDate}
-    onSelect={setTempSelectedDate}
-    locale={ptBR}
-    showOutsideDays
-    fixedWeeks
-    components={{ Caption: CalendarCaption }}
-    formatters={{
-        // A inspiração usa o padrão "S M T W T F S"
-        // Para isso, criamos um formatador customizado.
-        formatWeekdayName: (day, options) => {
-            const weekday = format(day, 'ccc', { locale: options?.locale }).charAt(0);
-            // Para o português, o padrão é D S T Q Q S S, vamos ajustar
-            // se o dia for "domingo", o resultado de charAt(0) será "d", trocamos para "S"
-            // para corresponder à inspiração (Sunday)
-            if (format(day, 'ccc', { locale: options?.locale }) === 'dom.') {
-                return 'S';
-            }
-            return weekday.toUpperCase();
-        }
-    }}
-/>
-                <div className="mt-6 flex justify-end gap-x-3">
+                <DayPicker
+                    mode="single"
+                    selected={tempSelectedDate}
+                    onSelect={setTempSelectedDate}
+                    locale={ptBR}
+                    showOutsideDays
+                    fixedWeeks
+                />
+                <div className="mt-4 flex justify-end gap-x-3">
                     <button 
                         type="button" 
                         onClick={() => setIsCalendarOpen(false)}
@@ -442,7 +393,7 @@ export default function Appointments() {
           </div>
         )}
 
-        {/* ... (Modal de Adicionar/Editar e outros - inalterados) ... */}
+        {/* Modal de Adicionar/Editar Agendamento */}
         {isModalOpen && (
            <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -535,8 +486,8 @@ export default function Appointments() {
             <Plus className="w-6 h-6" />
           </button>
         </div>
-
       </div>
     </Layout>
   );
 }
+
