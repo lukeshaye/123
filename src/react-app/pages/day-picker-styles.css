@@ -1,0 +1,41 @@
+/* Estilos personalizados para react-day-picker 
+  para uma aparência minimalista e sofisticada.
+*/
+
+:root {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: #ec4899; /* Rosa (pink-500) */
+  --rdp-background-color: #fce7f3; /* Rosa claro (pink-100) */
+  --rdp-accent-color-dark: #be185d; /* Rosa escuro (pink-700) */
+  --rdp-background-color-dark: #9d174d; /* Rosa muito escuro (pink-800) */
+  --rdp-outline: 2px solid var(--rdp-accent-color);
+  --rdp-outline-selected: 3px solid var(--rdp-accent-color);
+  --rdp-font-family: 'Inter', sans-serif;
+}
+
+.rdp {
+  margin: 1em auto;
+}
+
+.rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+  background-color: var(--rdp-background-color);
+}
+
+.rdp-day_today {
+  font-weight: bold;
+  color: var(--rdp-accent-color);
+}
+
+.rdp-day_today:not(.rdp-day_selected) {
+    background-color: transparent !important;
+    border: 1px solid var(--rdp-accent-color) !important;
+}
+
+.rdp-caption_label {
+    font-weight: 600;
+    color: #374151; /* gray-700 */
+}
+
+.rdp-nav_button {
+    color: #4b5563; /* gray-600 */
+}

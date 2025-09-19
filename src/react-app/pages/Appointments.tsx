@@ -1,40 +1,67 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
 import { useAppStore } from '../../shared/store';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { Plus, X, User } from 'lucide-react';
-import { Calendar as BigCalendar, momentLocalizer, View, Views } from 'react-big-calendar';
+import ConfirmationModal from '../components/ConfirmationModal';
+import { useToastHelpers } from '../contexts/ToastContext';
+import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { DayPicker } from 'react-day-picker';
+import { ptBR } from 'date-fns/locale';
 import moment from 'moment';
 import 'moment/locale/pt-br';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
-import './calendar-styles.css';
-import type { AppointmentType, ClientType, BusinessHoursType, ProfessionalType, ServiceType } from '../../shared/types';
+import type { AppointmentType, ClientType, ProfessionalType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
-import { useToastHelpers } from '../contexts/ToastContext';
-import ConfirmationModal from '../components/ConfirmationModal';
-import { useMediaQuery } from '../hooks/useMediaQuery';
-import { useSwipeable } from 'react-swipeable';
 
-// --- Configuração do Localizer (Mantido) ---
-moment.locale('pt-br');
-moment.updateLocale('pt-br', {
-  months: [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
-    "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-  ],
-  monthsShort: "Jan_Fev_Mar_Abr_Mai_Jun_Jul_Ago_Set_Out_Nov_Dez".split("_"),
-  weekdays: [
-    "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"
-  ],
-  weekdaysShort: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
-  weekdaysMin: ["Do", "Se", "Te", "Qu", "Qu", "Se", "Sá"],
-});
-const localizer = momentLocalizer(moment);
+// --- COMPONENTE DE ESTILOS ---
+const CalendarStyles = () => (
+  <style>{`
+    /* Base styles from react-day-picker/dist/style.css */
+    .rdp {
+      --rdp-cell-size: 40px;
+      --rdp-accent-color: #ec4899;
+      --rdp-background-color: #fce7f3;
+      --rdp-outline: 2px solid var(--rdp-accent-color);
+      --rdp-outline-selected: 3px solid var(--rdp-accent-color);
+      margin: 1em auto;
+      font-family: 'Inter', sans-serif;
+    }
+    .rdp-vhidden {
+        box-sizing: border-box !important; padding: 0 !important; margin: 0 !important; height: 1px !important; width: 1px !important;
+        overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; clip-path: inset(50%) !important;
+        border: 0 !important; position: absolute !important; white-space: nowrap !important;
+    }
+    .rdp-caption { display: flex; align-items: center; justify-content: space-between; padding-bottom: 0.5em; text-align: left; }
+    .rdp-caption_label { font-size: .875em; font-weight: 700; color: #374151; z-index: 1; }
+    .rdp-nav { display: flex; align-items: center; }
+    .rdp-nav_button {
+        display: inline-flex; align-items: center; justify-content: center; padding: .25em;
+        width: var(--rdp-cell-size); height: var(--rdp-cell-size); border-radius: 100%;
+        background-color: transparent; box-shadow: none; border: none; cursor: pointer; color: #4b5563;
+    }
+    .rdp-table { margin: 0; max-width: calc(var(--rdp-cell-size) * 7); border-collapse: collapse; }
+    .rdp-head_row, .rdp-row { height: var(--rdp-cell-size); }
+    .rdp-head_cell, .rdp-cell { padding: 0; width: var(--rdp-cell-size); height: var(--rdp-cell-size); text-align: center; box-sizing: border-box; }
+    .rdp-head_cell { font-size: .75em; font-weight: 700; color: #6b7280; }
+    .rdp-button {
+        width: 100%; height: 100%; border: 2px solid transparent; border-radius: 100%;
+        background-color: transparent; font-family: inherit; font-size: inherit;
+        font-weight: 400; color: inherit; cursor: pointer;
+    }
+    .rdp-button:focus-visible:not([disabled]) { z-index: 2; border: none; outline: var(--rdp-outline); }
+    .rdp-day_today { font-weight: bold; color: var(--rdp-accent-color); }
+    .rdp-day_today:not(.rdp-day_selected) { background-color: transparent !important; border: 1px solid var(--rdp-accent-color) !important; }
+    .rdp-day_selected, .rdp-day_selected:focus-visible, .rdp-day_selected:hover { color: #fff; background-color: var(--rdp-accent-color); opacity: 1; }
+    .rdp-day_selected:focus-visible{ outline: var(--rdp-outline-selected); }
+    .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: var(--rdp-background-color); }
+    .rdp-day_outside { opacity: .25; }
+    .rdp-day_disabled { opacity: .25; cursor: default; }
+  `}</style>
+);
 
-// --- Tipos (Mantidos) ---
+// --- Definição de Tipos ---
 interface AppointmentFormData {
   client_id: number;
   professional_id: number;
@@ -46,146 +73,54 @@ interface AppointmentFormData {
 }
 
 const defaultFormValues: Partial<AppointmentFormData> = {
-    client_id: undefined,
-    professional_id: undefined,
-    service_id: undefined,
-    price: undefined,
-    appointment_date: '',
-    end_date: '',
-    attended: false,
+  client_id: undefined,
+  professional_id: undefined,
+  service_id: undefined,
+  price: undefined,
+  appointment_date: '',
+  end_date: '',
+  attended: false,
 };
-
-interface CalendarEvent {
-  id: number;
-  title: string;
-  start: Date;
-  end: Date;
-  resource: AppointmentType;
-}
-
-// --- Componente de Evento Adaptativo (MODIFICADO) ---
-interface CustomEventProps {
-  event: CalendarEvent;
-  view: View; // <-- Recebe a visualização atual
-}
-
-const CustomEvent = ({ event, view }: CustomEventProps) => {
-  const { clients, services, professionals } = useAppStore.getState();
-  
-  const client = clients.find(c => c.id === event.resource.client_id);
-  const service = services.find(s => s.id === event.resource.service_id);
-  const professional = professionals.find(p => p.id === event.resource.professional_id);
-
-  const clientFirstName = (client?.name || event.resource.client_name || '').split(' ')[0];
-  const serviceName = service?.name || event.resource.service;
-  
-  const startTime = moment(event.start).format('HH:mm');
-  const endTime = moment(event.end).format('HH:mm');
-  
-  const tooltipTitle = `${startTime} - ${endTime} - ${client?.name || ''} - ${serviceName} - ${professional?.name || ''}`;
-
-  // Renderiza o conteúdo com base na visualização atual
-  const renderContent = () => {
-    switch (view) {
-      case Views.DAY:
-      case Views.AGENDA:
-        // MODIFICADO: Usa spans para manter o conteúdo em linha
-        return (
-          <div className="text-xs">
-            <span className="font-bold">{`${startTime} - ${endTime}`}</span>
-            <span className="mx-1">-</span>
-            <span>{client?.name}</span>
-            <span className="mx-1">-</span>
-            <span>{serviceName}</span>
-            <span className="mx-1">-</span>
-            <span className="italic opacity-80">{professional?.name}</span>
-          </div>
-        );
-      
-      case Views.WEEK:
-      case Views.MONTH:
-      default:
-        const displayText = `${clientFirstName} - ${serviceName}`;
-        return (
-          <p className="font-semibold text-xs">{displayText}</p>
-        );
-    }
-  };
-
-  return (
-    <div title={tooltipTitle} className="h-full">
-      {renderContent()}
-    </div>
-  );
-};
-
 
 // --- Componente Principal ---
 export default function Appointments() {
   const { user } = useSupabaseAuth();
   const { showSuccess, showError } = useToastHelpers();
-  
-  const { 
-    appointments, 
-    clients, 
-    professionals, 
-    services,
-    businessHours,
-    loading, 
-    fetchAppointments, 
-    fetchClients, 
-    fetchProfessionals,
-    fetchServices,
-    fetchBusinessHours,
-    addAppointment,
-    updateAppointment,
-    deleteAppointment
-  } = useAppStore();
-
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [editingAppointment, setEditingAppointment] = useState<AppointmentType | null>(null);
-  const [view, setView] = useState<View>(isMobile ? Views.DAY : Views.WEEK);
-  const [date, setDate] = useState(new Date());
-  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
 
   const {
-    register,
-    handleSubmit,
-    reset,
-    control,
-    setValue,
-    formState: { errors, isSubmitting },
+    appointments, clients, professionals, services, loading,
+    fetchAppointments, fetchClients, fetchProfessionals, fetchServices,
+    addAppointment, updateAppointment, deleteAppointment
+  } = useAppStore();
+
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentType | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
+
+  const {
+    register, handleSubmit, reset, setValue, watch
   } = useForm<AppointmentFormData>({
     resolver: zodResolver(AppointmentFormSchema) as any,
-    defaultValues: defaultFormValues
+    defaultValues: defaultFormValues,
   });
-  
-  const watchedServiceId = useWatch({ control, name: 'service_id' });
-  const watchedStartDate = useWatch({ control, name: 'appointment_date' });
+
+  const watchedServiceId = watch('service_id');
+  const watchedStartDate = watch('appointment_date');
 
   useEffect(() => {
     if (user) {
-      fetchClients(user.id);
-      fetchProfessionals(user.id);
-      fetchServices(user.id);
-      fetchBusinessHours(user.id);
+      Promise.all([
+        fetchClients(user.id),
+        fetchProfessionals(user.id),
+        fetchServices(user.id),
+        fetchAppointments(user.id),
+      ]);
     }
-  }, [user, fetchClients, fetchProfessionals, fetchServices, fetchBusinessHours]);
-
-  useEffect(() => {
-    if (user) {
-      fetchAppointments(user.id); 
-    }
-  }, [user, fetchAppointments]);
+  }, [user, fetchClients, fetchProfessionals, fetchServices, fetchAppointments]);
   
-  useEffect(() => {
-    setView(isMobile ? Views.DAY : Views.WEEK);
-  }, [isMobile]);
-
   useEffect(() => {
     if (watchedServiceId && services.length > 0) {
       const selectedService = services.find(s => s.id === Number(watchedServiceId));
@@ -199,124 +134,57 @@ export default function Appointments() {
     }
   }, [watchedServiceId, watchedStartDate, services, setValue]);
 
-  const { minTime, maxTime } = useMemo(() => {
-    if (!businessHours || businessHours.length === 0) {
-      return {
-        minTime: moment().startOf('day').add(8, 'hours').toDate(),
-        maxTime: moment().startOf('day').add(20, 'hours').toDate(),
-      };
-    }
-    let min = '23:59';
-    let max = '00:00';
-    businessHours.forEach((hour: BusinessHoursType) => {
-      if (hour.start_time && hour.start_time < min) min = hour.start_time;
-      if (hour.end_time && hour.end_time > max) max = hour.end_time;
-    });
-    return {
-      minTime: moment().startOf('day').add(moment.duration(min)).toDate(),
-      maxTime: moment().startOf('day').add(moment.duration(max)).toDate(),
-    };
-  }, [businessHours]);
-
   const filteredAppointments = useMemo(() => {
-    if (selectedProfessionalId === null) {
-      return appointments;
-    }
-    return appointments.filter(app => app.professional_id === selectedProfessionalId);
-  }, [appointments, selectedProfessionalId]);
-
-  const calendarEvents: CalendarEvent[] = useMemo(() => filteredAppointments.map((appointment: AppointmentType) => ({
-      id: appointment.id!,
-      title: `${clients.find(c => c.id === appointment.client_id)?.name || appointment.client_name}`,
-      start: new Date(appointment.appointment_date),
-      end: new Date(appointment.end_date),
-      resource: appointment,
-  })), [filteredAppointments, clients]);
-
-  const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => {
-      if (view === Views.DAY) setDate(moment(date).add(1, 'day').toDate());
-    },
-    onSwipedRight: () => {
-      if (view === Views.DAY) setDate(moment(date).subtract(1, 'day').toDate());
-    },
-    preventScrollOnSwipe: true,
-    trackMouse: true,
-  });
-
-  const onSubmit = async (data: AppointmentFormData) => {
-    if (!user) return;
+    if (!selectedDate) return [];
     
-    const newStart = moment(data.appointment_date);
-    const newEnd = moment(data.end_date);
-    const professionalId = Number(data.professional_id);
+    return appointments
+      .filter(app => {
+        const isSameDay = moment(app.appointment_date).isSame(selectedDate, 'day');
+        const professionalMatch = selectedProfessionalId === null || app.professional_id === selectedProfessionalId;
+        return isSameDay && professionalMatch;
+      })
+      .sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime());
+  }, [appointments, selectedDate, selectedProfessionalId]);
 
-    const conflictingAppointment = appointments.find(app => {
-        if (editingAppointment && app.id === editingAppointment.id) return false;
-        if (app.professional_id !== professionalId) return false;
-        const existingStart = moment(app.appointment_date);
-        const existingEnd = moment(app.end_date);
-        return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
-    });
+  const groupedAppointments = useMemo(() => {
+    return filteredAppointments.reduce((acc, app) => {
+      const time = moment(app.appointment_date).format('HH:mm');
+      if (!acc[time]) acc[time] = [];
+      acc[time].push(app);
+      return acc;
+    }, {} as Record<string, AppointmentType[]>);
+  }, [filteredAppointments]);
 
-    if (conflictingAppointment) {
-        showError("Conflito de Horário", "O profissional selecionado já tem um agendamento neste horário.");
-        return;
+  const handleDateChange = (date: Date | undefined) => setSelectedDate(date);
+  
+  const handleDayNavigation = (direction: 'prev' | 'next') => {
+      const newDate = moment(selectedDate || new Date()).add(direction === 'prev' ? -1 : 1, 'day').toDate();
+      setSelectedDate(newDate);
+  }
+
+  const handleOpenModal = (appointment?: AppointmentType, slotDate?: Date) => {
+    if (appointment) {
+      setEditingAppointment(appointment);
+      reset({
+        client_id: appointment.client_id,
+        professional_id: appointment.professional_id,
+        service_id: appointment.service_id,
+        price: appointment.price / 100,
+        appointment_date: moment(appointment.appointment_date).format('YYYY-MM-DDTHH:mm'),
+        end_date: moment(appointment.end_date).format('YYYY-MM-DDTHH:mm'),
+        attended: appointment.attended,
+      });
+    } else {
+      setEditingAppointment(null);
+      const initialDate = slotDate || selectedDate || new Date();
+      reset({
+          ...defaultFormValues,
+          appointment_date: moment(initialDate).format('YYYY-MM-DDTHH:mm'),
+          end_date: moment(initialDate).add(30, 'minutes').format('YYYY-MM-DDTHH:mm'),
+          professional_id: selectedProfessionalId ?? undefined,
+      });
     }
-    
-    const client = clients.find((c: ClientType) => c.id === Number(data.client_id));
-    const professional = professionals.find((p: ProfessionalType) => p.id === Number(data.professional_id));
-    const service = services.find((s: ServiceType) => s.id === Number(data.service_id));
-
-    if (!client || !professional || !service) {
-        showError("Dados inválidos.", "Cliente, profissional ou serviço não encontrado.");
-        return;
-    }
-    
-    const appointmentData = {
-      ...data,
-      price: Math.round(Number(data.price) * 100),
-      client_id: Number(data.client_id),
-      professional_id: professionalId,
-      service_id: Number(data.service_id),
-      client_name: client.name,
-      professional: professional.name,
-      service: service.name,
-      attended: data.attended ?? false,
-    };
-
-    try {
-      if (editingAppointment) {
-        await updateAppointment({ ...editingAppointment, ...appointmentData });
-        showSuccess("Agendamento atualizado!");
-      } else {
-        await addAppointment(appointmentData, user.id);
-        showSuccess("Agendamento criado com sucesso!");
-      }
-      handleCloseModal();
-    } catch (error) {
-      showError("Não foi possível salvar", "Verifique os dados e tente novamente.");
-    }
-  };
-
-  const handleDeleteClick = (appointment: AppointmentType) => {
-    setAppointmentToDelete(appointment);
-    setIsConfirmModalOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!user || !appointmentToDelete) return;
-    setIsDeleting(true);
-    try {
-      await deleteAppointment(appointmentToDelete.id!);
-      showSuccess("Agendamento removido!");
-      setIsConfirmModalOpen(false);
-      setAppointmentToDelete(null);
-    } catch (err: any) {
-      showError("Falha ao remover agendamento.");
-    } finally {
-      setIsDeleting(false);
-    }
+    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -324,61 +192,84 @@ export default function Appointments() {
     setEditingAppointment(null);
     reset(defaultFormValues);
   };
-
-  const handleSelectSlot = useCallback(({ start }: { start: Date }) => {
-    const appointmentDateTime = moment(start).format('YYYY-MM-DDTHH:mm');
-    const endDateTime = moment(start).add(1, 'hour').format('YYYY-MM-DDTHH:mm');
-    reset({ 
-      ...defaultFormValues, 
-      appointment_date: appointmentDateTime, 
-      end_date: endDateTime,
-      professional_id: selectedProfessionalId ?? undefined
-    });
-    setEditingAppointment(null);
-    setIsModalOpen(true);
-  }, [reset, selectedProfessionalId]);
-
-  const handleSelectEvent = useCallback((event: CalendarEvent) => {
-    setEditingAppointment(event.resource);
-    reset({
-      client_id: event.resource.client_id,
-      professional_id: event.resource.professional_id,
-      service_id: event.resource.service_id,
-      price: event.resource.price / 100,
-      appointment_date: moment(event.start).format('YYYY-MM-DDTHH:mm'),
-      end_date: moment(event.end).format('YYYY-MM-DDTHH:mm'),
-      attended: event.resource.attended,
-    });
-    setIsModalOpen(true);
-  }, [reset]);
   
-  const eventPropGetter = useCallback(
-    (event: CalendarEvent) => {
-      const professional = professionals.find(p => p.id === event.resource.professional_id);
-      // @ts-ignore
-      const professionalColor = professional?.color;
-      if (professionalColor && view !== 'agenda') {
-        return { style: { backgroundColor: professionalColor, borderColor: professionalColor } };
-      }
-      return {};
-    }, [professionals, view]
-  );
+  const onSubmit = async (data: AppointmentFormData) => {
+     if (!user) return;
+     const newStart = moment(data.appointment_date);
+     const newEnd = moment(data.end_date);
+     const professionalId = Number(data.professional_id);
+     const conflictingAppointment = appointments.find(app => {
+         if (editingAppointment && app.id === editingAppointment.id) return false;
+         if (app.professional_id !== professionalId) return false;
+         const existingStart = moment(app.appointment_date);
+         const existingEnd = moment(app.end_date);
+         return newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart);
+     });
+     if (conflictingAppointment) {
+         showError("Conflito de Horário", "O profissional já tem um agendamento neste horário.");
+         return;
+     }
+     const client = clients.find(c => c.id === Number(data.client_id));
+     const professional = professionals.find(p => p.id === Number(data.professional_id));
+     const service = services.find(s => s.id === Number(data.service_id));
+     if (!client || !professional || !service) {
+         showError("Dados inválidos.", "Cliente, profissional ou serviço não encontrado.");
+         return;
+     }
+     const appointmentData = {
+       ...data,
+       price: Math.round(Number(data.price) * 100),
+       client_id: Number(data.client_id),
+       professional_id: professionalId,
+       service_id: Number(data.service_id),
+       client_name: client.name,
+       professional: professional.name,
+       service: service.name,
+       attended: data.attended ?? false,
+     };
+     try {
+       if (editingAppointment) {
+         await updateAppointment({ ...editingAppointment, ...appointmentData });
+         showSuccess("Agendamento atualizado!");
+       } else {
+         await addAppointment(appointmentData, user.id);
+         showSuccess("Agendamento criado!");
+       }
+       handleCloseModal();
+     } catch (error) {
+       showError("Não foi possível salvar", "Verifique os dados e tente novamente.");
+     }
+  };
 
-  const components = useMemo(() => ({
-    event: (props: any) => <CustomEvent {...props} view={view} />
-  }), [view]);
+  const handleDeleteClick = (appointment: AppointmentType) => {
+    setAppointmentToDelete(appointment);
+    setIsDeleteModalOpen(true);
+  };
 
-  if (loading.clients || loading.professionals || loading.services || loading.businessHours) {
+  const handleDeleteConfirm = async () => {
+    if (!user || !appointmentToDelete) return;
+    try {
+      await deleteAppointment(appointmentToDelete.id!);
+      showSuccess("Agendamento removido!");
+      setIsDeleteModalOpen(false);
+      setAppointmentToDelete(null);
+    } catch (err: any) {
+      showError("Falha ao remover agendamento.");
+    }
+  };
+
+  if (loading.clients || loading.professionals || loading.services || loading.appointments) {
     return <Layout><LoadingSpinner /></Layout>;
   }
 
   return (
     <Layout>
-      <div className="px-4 sm:px-6 lg:px-8 pb-24 sm:pb-8">
+      <CalendarStyles />
+      <div className="px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Agendamentos</h1>
-            <p className="mt-2 text-gray-600">Gerencie todos os seus agendamentos</p>
+            <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
+            <p className="mt-2 text-gray-600">Visualize e gerencie os seus agendamentos</p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
              <div className="relative">
@@ -390,15 +281,15 @@ export default function Appointments() {
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 text-sm"
                 >
                   <option value="">Todos os Profissionais</option>
-                  {professionals.map((prof: ProfessionalType) => (
+                  {professionals.map((prof) => (
                     <option key={prof.id} value={prof.id!}>{prof.name}</option>
                   ))}
                 </select>
              </div>
             <button
               type="button"
-              onClick={() => handleSelectSlot({ start: new Date() })}
-              className="hidden sm:inline-flex items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-pink-600 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2"
+              onClick={() => handleOpenModal()}
+              className="hidden sm:inline-flex items-center justify-center rounded-md border border-transparent bg-gradient-to-r from-pink-500 to-violet-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:from-pink-600 hover:to-violet-600"
             >
               <Plus className="w-4 h-4 mr-2" />
               Agendar
@@ -406,60 +297,87 @@ export default function Appointments() {
           </div>
         </div>
 
-        <div {...swipeHandlers} className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-2 sm:p-6 relative">
-          {loading.appointments && <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center z-10"><LoadingSpinner /></div>}
-          <div style={{ height: '70vh' }}>
-            <BigCalendar
-              localizer={localizer}
-              events={calendarEvents}
-              startAccessor="start"
-              endAccessor="end"
-              view={view}
-              onView={setView}
-              date={date}
-              onNavigate={setDate}
-              onSelectSlot={handleSelectSlot}
-              onSelectEvent={handleSelectEvent}
-              selectable
-              culture='pt-br'
-              eventPropGetter={eventPropGetter}
-              components={components}
-              messages={{
-                next: 'Próximo',
-                previous: 'Anterior',
-                today: 'Hoje',
-                month: 'Mês',
-                week: 'Semana',
-                day: 'Dia',
-                agenda: 'Agenda',
-                date: 'Data',
-                time: 'Hora',
-                event: 'Evento',
-                noEventsInRange: 'Nenhum agendamento neste período.',
-                showMore: (total: number) => `+ Ver mais (${total})`,
-              }}
-              formats={{
-                timeGutterFormat: 'HH:mm',
-                dayFormat: 'ddd, DD/MM',
-                weekdayFormat: 'dddd',
-                monthHeaderFormat: 'MMMM [de] YYYY',
-                dayHeaderFormat: 'dddd, D [de] MMMM',
-                agendaHeaderFormat: ({ start, end }, culture, local) => 
-                  local!.format(start, 'dddd, DD [de] MMMM', culture),
-                agendaDateFormat: 'ddd DD [de] MMM',
-                dayRangeHeaderFormat: ({ start, end }, culture, local) => 
-                  `${local!.format(start, 'DD/MM', culture)} - ${local!.format(end, 'DD/MM', culture)}`,
-                agendaTimeFormat: 'HH:mm',
-                agendaTimeRangeFormat: ({ start, end }, culture, local) => 
-                  `${local!.format(start, 'HH:mm', culture)} – ${local!.format(end, 'HH:mm', culture)}`,
-                eventTimeRangeFormat: ({ start, end }, culture, local) => 
-                  `${local!.format(start, 'HH:mm', culture)} - ${local!.format(end, 'HH:mm', culture)}`,
-              }}
-              min={minTime}
-              max={maxTime}
-              step={60}
-              timeslots={1}
-            />
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-4 xl:col-span-3">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+               <DayPicker
+                mode="single"
+                selected={selectedDate}
+                onSelect={handleDateChange}
+                locale={ptBR}
+                showOutsideDays
+                fixedWeeks
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-8 xl:col-span-9">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[60vh]">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                 <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
+                 <div className="text-center">
+                    <h2 className="text-lg font-semibold text-gray-800 capitalize">
+                        {selectedDate ? moment(selectedDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
+                    </h2>
+                    <button onClick={() => setSelectedDate(new Date())} className="text-sm text-pink-600 hover:underline">Hoje</button>
+                 </div>
+                 <button onClick={() => handleDayNavigation('next')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronRight className="w-5 h-5"/></button>
+              </div>
+
+              <div className="p-4 sm:p-6">
+                {Object.keys(groupedAppointments).length === 0 ? (
+                  <div className="text-center py-20">
+                    <CalendarIcon className="mx-auto h-12 w-12 text-gray-300" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum agendamento</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Não há nada na agenda para este dia.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {Object.entries(groupedAppointments).map(([time, apps]) => (
+                      <div key={time} className="relative flex gap-x-3">
+                        <div className="flex-shrink-0 flex flex-col items-center">
+                          <p className="text-xs text-gray-500 font-medium mb-1">{time}</p>
+                          <div className="relative flex h-full w-6 justify-center items-center">
+                            <div className="h-full w-0.5 bg-gray-200"></div>
+                            <div className="absolute top-0 w-4 h-4 rounded-full bg-pink-500 border-2 border-white"></div>
+                          </div>
+                        </div>
+                        <div className="flex-grow pb-6">
+                          <div className="space-y-3">
+                            {apps.map(app => {
+                                const professional = professionals.find(p => p.id === app.professional_id);
+                                const service = services.find(s => s.id === app.service_id);
+                                const client = clients.find(c => c.id === app.client_id);
+                                return (
+                                <div 
+                                    key={app.id} 
+                                    className="bg-gray-50 p-3 rounded-lg border-l-4 cursor-pointer hover:bg-gray-100 transition-colors"
+                                    style={{ borderLeftColor: professional?.color || '#a855f7' }}
+                                    onClick={() => handleOpenModal(app)}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                          <p className="font-semibold text-gray-800">{service?.name || 'Serviço não encontrado'}</p>
+                                          <p className="text-sm text-gray-600">{client?.name || 'Cliente não encontrado'}</p>
+                                          <p className="text-xs text-gray-500 mt-1">com {professional?.name || 'Profissional não encontrado'}</p>
+                                        </div>
+                                        <div className="text-right flex-shrink-0 ml-4">
+                                          <p className="text-sm font-medium text-gray-800">{moment(app.end_date).diff(moment(app.appointment_date), 'minutes')} min</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -469,111 +387,93 @@ export default function Appointments() {
               <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleCloseModal}></div>
               <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                 <form onSubmit={handleSubmit(onSubmit)}>
-                  <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">{editingAppointment ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
-                      <button type="button" onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">Cliente *</label>
-                        <select
-                          {...register('client_id', { valueAsNumber: true })}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
-                        >
-                          <option value="">Selecione um cliente</option>
-                          {clients.map((client) => ( <option key={client.id} value={client.id!}>{client.name}</option> ))}
-                        </select>
-                        {errors.client_id && <p className="mt-1 text-sm text-red-600">{errors.client_id.message}</p>}
-                      </div>
+                   <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                     <div className="flex items-center justify-between mb-4">
+                       <h3 className="text-lg font-medium text-gray-900">{editingAppointment ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
+                       <button type="button" onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+                     </div>
+                     <div className="space-y-4">
                        <div>
-                        <label htmlFor="professional_id" className="block text-sm font-medium text-gray-700">Profissional *</label>
-                        <select
-                          {...register('professional_id', { valueAsNumber: true })}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
-                        >
-                          <option value="">Selecione um profissional</option>
-                          {professionals.map((prof) => (<option key={prof.id} value={prof.id!}>{prof.name}</option>))}
-                        </select>
-                        {errors.professional_id && <p className="mt-1 text-sm text-red-600">{errors.professional_id.message}</p>}
-                      </div>
-                      <div>
-                        <label htmlFor="service_id" className="block text-sm font-medium text-gray-700">Serviço *</label>
-                         <select
-                          {...register('service_id', { valueAsNumber: true })}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
-                        >
-                          <option value="">Selecione um serviço</option>
-                          {services.map((service) => (<option key={service.id} value={service.id!}>{service.name}</option>))}
-                        </select>
-                        {errors.service_id && <p className="mt-1 text-sm text-red-600">{errors.service_id.message}</p>}
-                      </div>
-                      <div>
-                        <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço (R$) *</label>
-                        <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} placeholder="50,00" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
-                        {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>}
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                         <div>
-                          <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700">Início *</label>
-                          <input type="datetime-local" {...register('appointment_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
-                          {errors.appointment_date && <p className="mt-1 text-sm text-red-600">{errors.appointment_date.message}</p>}
-                        </div>
+                         <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">Cliente *</label>
+                         <select {...register('client_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
+                           <option value="">Selecione um cliente</option>
+                           {clients.map((client) => ( <option key={client.id} value={client.id!}>{client.name}</option> ))}
+                         </select>
+                       </div>
                         <div>
-                          <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">Fim *</label>
-                          <input type="datetime-local" {...register('end_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
-                          {errors.end_date && <p className="mt-1 text-sm text-red-600">{errors.end_date.message}</p>}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse items-center">
-                     <button type="submit" disabled={isSubmitting} className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-pink-500 to-violet-500 text-base font-medium text-white hover:from-pink-600 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
-                      {isSubmitting ? 'Salvando...' : (editingAppointment ? 'Atualizar' : 'Criar')}
-                    </button>
-                    <button type="button" onClick={handleCloseModal} className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 sm:mt-0 sm:w-auto sm:text-sm">
-                      Cancelar
-                    </button>
-                     {editingAppointment && (
-                        <button
-                        type="button"
-                        onClick={() => handleDeleteClick(editingAppointment)}
-                        className="mt-3 sm:mt-0 mr-auto w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:w-auto sm:text-sm"
-                        >
-                        Excluir
-                        </button>
-                    )}
-                  </div>
+                         <label htmlFor="professional_id" className="block text-sm font-medium text-gray-700">Profissional *</label>
+                         <select {...register('professional_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
+                           <option value="">Selecione um profissional</option>
+                           {professionals.map((prof) => (<option key={prof.id} value={prof.id!}>{prof.name}</option>))}
+                         </select>
+                       </div>
+                       <div>
+                         <label htmlFor="service_id" className="block text-sm font-medium text-gray-700">Serviço *</label>
+                          <select {...register('service_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
+                           <option value="">Selecione um serviço</option>
+                           {services.map((service) => (<option key={service.id} value={service.id!}>{service.name}</option>))}
+                         </select>
+                       </div>
+                       <div>
+                         <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço (R$) *</label>
+                         <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} placeholder="50,00" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                           <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700">Início *</label>
+                           <input type="datetime-local" {...register('appointment_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                         </div>
+                         <div>
+                           <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">Fim *</label>
+                           <input type="datetime-local" {...register('end_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                   <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse items-center">
+                      <button type="submit" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-pink-500 to-violet-500 text-base font-medium text-white hover:from-pink-600 hover:to-violet-600 sm:ml-3 sm:w-auto sm:text-sm">
+                       {editingAppointment ? 'Atualizar' : 'Criar'}
+                     </button>
+                     <button type="button" onClick={handleCloseModal} className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm">
+                       Cancelar
+                     </button>
+                      {editingAppointment && (
+                         <button
+                         type="button"
+                         onClick={() => handleDeleteClick(editingAppointment)}
+                         className="mt-3 sm:mt-0 mr-auto w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 sm:w-auto sm:text-sm"
+                         >
+                         Excluir
+                         </button>
+                     )}
+                   </div>
                 </form>
               </div>
             </div>
-          </div>
+           </div>
         )}
-        
+
         <ConfirmationModal
-          isOpen={isConfirmModalOpen}
-          onClose={() => setIsConfirmModalOpen(false)}
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
           onConfirm={handleDeleteConfirm}
           title="Excluir Agendamento"
-          message={`Tem certeza que deseja excluir o agendamento para "${appointmentToDelete?.client_name}"? Esta ação não pode ser desfeita.`}
+          message={`Tem certeza que deseja excluir o agendamento para "${appointmentToDelete?.client_name}"?`}
           confirmText="Excluir"
           cancelText="Cancelar"
           variant="danger"
-          isLoading={isDeleting}
         />
-      </div>
-      
-      {isMobile && (
-        <div className="fixed bottom-6 right-6 z-40">
+
+        <div className="lg:hidden fixed bottom-6 right-6 z-40">
           <button
-            onClick={() => handleSelectSlot({ start: new Date() })}
+            onClick={() => handleOpenModal()}
             className="bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-full p-4 shadow-lg hover:scale-110 active:scale-100 transition-transform duration-200"
             aria-label="Novo Agendamento"
           >
             <Plus className="w-6 h-6" />
           </button>
         </div>
-      )}
+      </div>
     </Layout>
   );
 }

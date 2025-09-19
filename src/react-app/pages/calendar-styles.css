@@ -106,3 +106,24 @@
   display: none !important;
 }
 
+/* --- Estilos da Visualização "Agenda" --- */
+
+/* Garante que o texto na visualização de agenda seja escuro e legível. */
+.rbc-agenda-view .rbc-event-content,
+.rbc-agenda-view .rbc-event-content p {
+    color: #374151; /* Cor de texto cinza escuro (Tailwind gray-700) */
+    white-space: normal; /* Permite quebra de linha */
+}
+
+.rbc-agenda-view .rbc-agenda-event-cell {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+/* NOVO: Adicione estas regras abaixo */
+/* Torna o texto das colunas de Data, Hora e Evento em negrito na Agenda */
+.rbc-agenda-view .rbc-agenda-date-cell,
+.rbc-agenda-view .rbc-agenda-time-cell,
+.rbc-agenda-view .rbc-agenda-event-cell {
+    font-weight: 700 !important; /* ou 'bold' */
+}
