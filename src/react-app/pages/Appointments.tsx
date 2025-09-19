@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+// Conteúdo para lukeshaye/123/123-5f0570ff95073e31fc5d52b40ea68e81e34212ac/src/react-app/pages/Appointments.tsx
+
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
@@ -15,9 +17,8 @@ import 'moment/locale/pt-br';
 import type { AppointmentType, ClientType, ProfessionalType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
 
-// Importa os novos estilos para o DayPicker
+// Importa os estilos para o DayPicker
 import './day-picker-styles.css';
-
 
 // --- Definição de Tipos ---
 interface AppointmentFormData {
@@ -57,6 +58,10 @@ export default function Appointments() {
   const [editingAppointment, setEditingAppointment] = useState<AppointmentType | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
+  
+  // Estado para controlar o pop-up do calendário
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   const {
     register, handleSubmit, reset, setValue, watch
@@ -92,6 +97,20 @@ export default function Appointments() {
     }
   }, [watchedServiceId, watchedStartDate, services, setValue]);
 
+  // Efeito para fechar o calendário ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setIsCalendarOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [calendarRef]);
+
+
   const filteredAppointments = useMemo(() => {
     if (!selectedDate) return [];
     
@@ -113,7 +132,10 @@ export default function Appointments() {
     }, {} as Record<string, AppointmentType[]>);
   }, [filteredAppointments]);
 
-  const handleDateChange = (date: Date | undefined) => setSelectedDate(date);
+  const handleDateChange = (date: Date | undefined) => {
+    setSelectedDate(date);
+    setIsCalendarOpen(false); // Fecha o pop-up ao selecionar
+  };
   
   const handleDayNavigation = (direction: 'prev' | 'next') => {
       const newDate = moment(selectedDate || new Date()).add(direction === 'prev' ? -1 : 1, 'day').toDate();
@@ -243,6 +265,33 @@ export default function Appointments() {
                   ))}
                 </select>
              </div>
+
+             {/* NOVO: Botão do Calendário e Lógica do Pop-up */}
+            <div className="relative" ref={calendarRef}>
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              >
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                {selectedDate ? moment(selectedDate).format('DD/MM/YYYY') : 'Selecionar Data'}
+              </button>
+              {isCalendarOpen && (
+                <div className="absolute top-full right-0 mt-2 z-20">
+                  <div className="bg-white p-4 rounded-lg shadow-lg border border-gray-200">
+                    <DayPicker
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateChange}
+                      locale={ptBR}
+                      showOutsideDays
+                      fixedWeeks
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => handleOpenModal()}
@@ -253,26 +302,10 @@ export default function Appointments() {
             </button>
           </div>
         </div>
-
-        {/* --- NOVO LAYOUT DE GRELHA --- */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 lg:gap-x-12">
-          
-          {/* Coluna do Calendário (lateral) */}
-          <div className="lg:col-span-4 xl:col-span-3">
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-               <DayPicker
-                mode="single"
-                selected={selectedDate}
-                onSelect={handleDateChange}
-                locale={ptBR}
-                showOutsideDays
-                fixedWeeks
-              />
-            </div>
-          </div>
-
-          {/* Coluna da Agenda (principal) */}
-          <div className="lg:col-span-8 xl:col-span-9 mt-8 lg:mt-0">
+        
+        {/* --- LAYOUT MODIFICADO PARA COLUNA ÚNICA --- */}
+        <div className="mt-8">
+          <div className="lg:col-span-12">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[60vh]">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center">
                  <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
@@ -342,6 +375,7 @@ export default function Appointments() {
           </div>
         </div>
 
+        {/* Modal e Botão FAB (sem alterações) */}
         {isModalOpen && (
            <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
