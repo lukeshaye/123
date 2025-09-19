@@ -63,25 +63,36 @@ interface CalendarEvent {
   resource: AppointmentType;
 }
 
-// --- Componente de Evento Customizado para Melhor Leitura ---
+// --- Componente de Evento Customizado para Melhor Leitura (MODIFICADO) ---
 interface CustomEventProps {
   event: CalendarEvent;
 }
 
 const CustomEvent = ({ event }: CustomEventProps) => {
   const { clients, services, professionals } = useAppStore.getState();
+  
   const client = clients.find(c => c.id === event.resource.client_id);
   const service = services.find(s => s.id === event.resource.service_id);
   const professional = professionals.find(p => p.id === event.resource.professional_id);
 
+  const clientFirstName = (client?.name || event.resource.client_name || '').split(' ')[0];
+  const serviceName = service?.name || event.resource.service;
+  
+  const startTime = moment(event.start).format('HH:mm');
+  const endTime = moment(event.end).format('HH:mm');
+  const tooltipTitle = `${startTime} - ${endTime} - ${client?.name || ''} - ${serviceName} - ${professional?.name || ''}`;
+
+  // MODIFICADO: Agora exibe apenas uma linha de texto.
+  const displayText = `${clientFirstName} - ${serviceName}`;
+
   return (
-    <div className="p-1 text-white text-xs overflow-hidden h-full flex flex-col">
-      <p className="font-bold truncate">{client?.name || event.resource.client_name}</p>
-      <p className="truncate flex-grow">{service?.name || event.resource.service}</p>
-      <p className="text-white/80 truncate italic">{professional?.name || event.resource.professional}</p>
+    <div title={tooltipTitle} className="text-white text-xs h-full flex flex-col justify-center">
+      {/* Exibe o texto em uma única linha, permitindo que o CSS aplique o ellipsis */}
+      <p className="font-semibold">{displayText}</p>
     </div>
   );
 };
+
 
 // --- Componente Principal ---
 export default function Appointments() {
@@ -540,3 +551,4 @@ export default function Appointments() {
     </Layout>
   );
 }
+
