@@ -12,14 +12,12 @@
   cursor: pointer !important;
 }
 
-/* --- Conteúdo do Evento --- */
+/* --- Conteúdo do Evento (Geral) --- */
 .rbc-event-content {
-  font-size: 0.75rem; /* 12px */
   height: 100%;
-  display: flex;
-  align-items: center;
 }
 
+/* Garante que o texto em parágrafos dentro de eventos possa ser truncado */
 .rbc-event-content p {
   white-space: nowrap;
   overflow: hidden;
@@ -28,13 +26,45 @@
   width: 100%;
 }
 
-/* NOVO: Esconde o horário padrão da biblioteca. */
-/* Nosso componente CustomEvent agora tem controle total sobre o texto. */
+/* Esconde a etiqueta de horário padrão da biblioteca em TODAS as visualizações.
+   Nosso componente CustomEvent agora gerencia a exibição do horário. */
 .rbc-event-label {
   display: none !important;
 }
 
-/* --- Correções de Layout --- */
+/* --- Estilos Específicos por Visualização --- */
+
+/* Para Mês e Semana, centraliza o conteúdo de linha única verticalmente */
+.rbc-month-view .rbc-event-content,
+.rbc-time-grid .rbc-event-content {
+  display: flex;
+  align-items: center;
+}
+
+/* Para a visualização de Dia, permite que o conteúdo flua como um bloco (multi-linha) */
+.rbc-time-grid .rbc-day-slot .rbc-event-content {
+  display: block;
+}
+.rbc-time-grid .rbc-day-slot .rbc-event-content p {
+  white-space: normal; /* Permite quebra de linha no modo Dia */
+}
+
+
+/* --- Estilos da Visualização "Agenda" --- */
+
+/* Garante que o texto na visualização de agenda seja escuro e legível. */
+.rbc-agenda-view .rbc-event-content,
+.rbc-agenda-view .rbc-event-content p {
+    color: #374151; /* Cor de texto cinza escuro (Tailwind gray-700) */
+    white-space: normal; /* Permite quebra de linha */
+}
+
+.rbc-agenda-view .rbc-agenda-event-cell {
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}
+
+/* --- Correções de Layout (Mantidas) --- */
 .rbc-day-slot .rbc-event {
   left: 0 !important;
   width: 100% !important;
@@ -52,7 +82,6 @@
   background-color: transparent !important;
 }
 
-/* Correção para o alinhamento do cabeçalho */
 .rbc-time-header-content {
   display: flex;
   flex: 1 0 0;
@@ -65,21 +94,6 @@
   flex: 1 0 0;
   min-width: 0;
 }
-
-
-/* --- Estilos da Visualização "Agenda" --- */
-
-/* NOVO: Garante que o texto na visualização de agenda seja escuro e legível. */
-.rbc-agenda-view .rbc-agenda-event-cell .rbc-event-content p {
-    color: #374151; /* Cor de texto cinza escuro (Tailwind gray-700) */
-}
-
-/* NOVO: Aumenta o espaço na célula da agenda para melhor visualização. */
-.rbc-agenda-view .rbc-agenda-event-cell {
-    padding-top: 5px !important;
-    padding-bottom: 5px !important;
-}
-
 
 /* --- Estilos Gerais da Grade (Mantidos) --- */
 .rbc-time-gutter .rbc-time-slot {

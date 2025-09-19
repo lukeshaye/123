@@ -18,7 +18,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useSwipeable } from 'react-swipeable';
 
-// --- Configuração do Localizer (Mantendo a sua personalização completa) ---
+// --- Configuração do Localizer (Mantido) ---
 moment.locale('pt-br');
 moment.updateLocale('pt-br', {
   months: [
@@ -34,7 +34,7 @@ moment.updateLocale('pt-br', {
 });
 const localizer = momentLocalizer(moment);
 
-// --- Tipos ---
+// --- Tipos (Mantidos) ---
 interface AppointmentFormData {
   client_id: number;
   professional_id: number;
@@ -63,12 +63,13 @@ interface CalendarEvent {
   resource: AppointmentType;
 }
 
-// --- Componente de Evento Customizado para Melhor Leitura (MODIFICADO) ---
+// --- Componente de Evento Adaptativo (MODIFICADO) ---
 interface CustomEventProps {
   event: CalendarEvent;
+  view: View; // <-- Recebe a visualização atual
 }
 
-const CustomEvent = ({ event }: CustomEventProps) => {
+const CustomEvent = ({ event, view }: CustomEventProps) => {
   const { clients, services, professionals } = useAppStore.getState();
   
   const client = clients.find(c => c.id === event.resource.client_id);
@@ -80,15 +81,40 @@ const CustomEvent = ({ event }: CustomEventProps) => {
   
   const startTime = moment(event.start).format('HH:mm');
   const endTime = moment(event.end).format('HH:mm');
+  
   const tooltipTitle = `${startTime} - ${endTime} - ${client?.name || ''} - ${serviceName} - ${professional?.name || ''}`;
 
-  // MODIFICADO: Agora exibe apenas uma linha de texto.
-  const displayText = `${clientFirstName} - ${serviceName}`;
+  // Renderiza o conteúdo com base na visualização atual
+  const renderContent = () => {
+    switch (view) {
+      case Views.DAY:
+      case Views.AGENDA:
+        // MODIFICADO: Usa spans para manter o conteúdo em linha
+        return (
+          <div className="text-xs">
+            <span className="font-bold">{`${startTime} - ${endTime}`}</span>
+            <span className="mx-1">-</span>
+            <span>{client?.name}</span>
+            <span className="mx-1">-</span>
+            <span>{serviceName}</span>
+            <span className="mx-1">-</span>
+            <span className="italic opacity-80">{professional?.name}</span>
+          </div>
+        );
+      
+      case Views.WEEK:
+      case Views.MONTH:
+      default:
+        const displayText = `${clientFirstName} - ${serviceName}`;
+        return (
+          <p className="font-semibold text-xs">{displayText}</p>
+        );
+    }
+  };
 
   return (
-    <div title={tooltipTitle} className="text-white text-xs h-full flex flex-col justify-center">
-      {/* Exibe o texto em uma única linha, permitindo que o CSS aplique o ellipsis */}
-      <p className="font-semibold">{displayText}</p>
+    <div title={tooltipTitle} className="h-full">
+      {renderContent()}
     </div>
   );
 };
@@ -116,7 +142,6 @@ export default function Appointments() {
     deleteAppointment
   } = useAppStore();
 
-  // --- Estados do Componente ---
   const isMobile = useMediaQuery('(max-width: 768px)');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -142,7 +167,6 @@ export default function Appointments() {
   const watchedServiceId = useWatch({ control, name: 'service_id' });
   const watchedStartDate = useWatch({ control, name: 'appointment_date' });
 
-  // --- Efeitos ---
   useEffect(() => {
     if (user) {
       fetchClients(user.id);
@@ -175,7 +199,6 @@ export default function Appointments() {
     }
   }, [watchedServiceId, watchedStartDate, services, setValue]);
 
-  // --- Cálculos e Memos ---
   const { minTime, maxTime } = useMemo(() => {
     if (!businessHours || businessHours.length === 0) {
       return {
@@ -210,7 +233,6 @@ export default function Appointments() {
       resource: appointment,
   })), [filteredAppointments, clients]);
 
-  // --- Manipuladores de Eventos ---
   const swipeHandlers = useSwipeable({
     onSwipedLeft: () => {
       if (view === Views.DAY) setDate(moment(date).add(1, 'day').toDate());
@@ -342,6 +364,10 @@ export default function Appointments() {
     }, [professionals, view]
   );
 
+  const components = useMemo(() => ({
+    event: (props: any) => <CustomEvent {...props} view={view} />
+  }), [view]);
+
   if (loading.clients || loading.professionals || loading.services || loading.businessHours) {
     return <Layout><LoadingSpinner /></Layout>;
   }
@@ -397,7 +423,7 @@ export default function Appointments() {
               selectable
               culture='pt-br'
               eventPropGetter={eventPropGetter}
-              components={{ event: CustomEvent }}
+              components={components}
               messages={{
                 next: 'Próximo',
                 previous: 'Anterior',
