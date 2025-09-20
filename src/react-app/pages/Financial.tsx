@@ -20,7 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  File as FileIcon // Ícone para CSV
+  File as FileIcon
 } from 'lucide-react';
 import type { FinancialEntryType } from '../../shared/types';
 import { CreateFinancialEntrySchema } from '../../shared/types';
@@ -63,9 +63,7 @@ export default function Financial() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>('all');
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'pontual' | 'fixa'>('all');
   
-  // NOVO ESTADO: Controla a abertura do menu FAB
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
-
 
   const [kpis, setKpis] = useState({
     monthlyRevenue: 0,
@@ -306,16 +304,7 @@ export default function Financial() {
             </button>
           </div>
         </div>
-
-        <div className="mt-6 flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
-            <button onClick={handlePreviousMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors"><ChevronLeft className="h-5 w-5 text-gray-600" /></button>
-            <div className="text-center">
-                <h2 className="text-lg font-semibold text-gray-800 capitalize">{formattedMonth}</h2>
-                <button onClick={handleCurrentMonth} className="text-sm text-pink-600 hover:underline">Mês Atual</button>
-            </div>
-            <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors"><ChevronRight className="h-5 w-5 text-gray-600" /></button>
-        </div>
-
+        
         {error && !isModalOpen && <div className="bg-red-50 p-4 rounded-md my-4 flex items-center"><AlertCircle className="h-5 w-5 text-red-500 mr-3" /><p className="text-sm text-red-700">{error}</p></div>}
 
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -326,17 +315,42 @@ export default function Financial() {
 
         <div className="mt-8">
             <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-                <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <h3 className="text-lg font-medium text-gray-900 whitespace-nowrap">Lançamentos do Mês</h3>
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
-                        <select id="type-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500">
-                            <option value="all">Todos os Tipos</option><option value="receita">Receitas</option><option value="despesa">Despesas</option>
-                        </select>
-                        <select id="frequency-filter" value={frequencyFilter} onChange={(e) => setFrequencyFilter(e.target.value as any)} className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500">
-                            <option value="all">Todas as Frequências</option><option value="pontual">Pontual</option><option value="fixa">Fixa</option>
-                        </select>
-                    </div>
+                <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-4">
+                      <div className="sm:col-span-1">
+                          <h3 className="text-lg font-medium text-gray-900 whitespace-nowrap">
+                              Lançamentos do Mês
+                          </h3>
+                      </div>
+                      
+                      <div className="sm:col-span-1 flex items-center justify-center order-first sm:order-none">
+                          <button onClick={handlePreviousMonth} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                              <ChevronLeft className="h-5 w-5 text-gray-600" />
+                          </button>
+                          <div className="text-center mx-2">
+                              <h2 className="text-base font-semibold text-gray-800 capitalize">{formattedMonth}</h2>
+                              <button onClick={handleCurrentMonth} className="text-xs text-pink-600 hover:underline">Mês Atual</button>
+                          </div>
+                          <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                              <ChevronRight className="h-5 w-5 text-gray-600" />
+                          </button>
+                      </div>
+
+                      <div className="sm:col-span-1 flex flex-col sm:flex-row items-center sm:justify-end gap-4 w-full">
+                          <select id="type-filter" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)} className="w-full sm:w-auto text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500">
+                              <option value="all">Todos os Tipos</option>
+                              <option value="receita">Receitas</option>
+                              <option value="despesa">Despesas</option>
+                          </select>
+                          <select id="frequency-filter" value={frequencyFilter} onChange={(e) => setFrequencyFilter(e.target.value as any)} className="w-full sm:w-auto text-sm border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500">
+                              <option value="all">Todas as Frequências</option>
+                              <option value="pontual">Pontual</option>
+                              <option value="fixa">Fixa</option>
+                          </select>
+                      </div>
+                  </div>
                 </div>
+
                 {filteredEntries.length === 0 ? (
                     <div className="text-center py-12"><CalendarIcon className="mx-auto h-12 w-12 text-gray-400" /><h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma entrada encontrada</h3><p className="mt-1 text-sm text-gray-500">Não há lançamentos para os filtros selecionados neste mês.</p></div>
                 ) : (
@@ -387,9 +401,8 @@ export default function Financial() {
         </div>
       </div>
       
-      {/* --- INÍCIO: MENU FAB CORRIGIDO PARA MOBILE --- */}
+      {/* --- MENU FAB CORRIGIDO PARA MOBILE --- */}
       <div className="sm:hidden fixed bottom-6 right-6 z-40">
-        {/* Backdrop */}
         {isFabMenuOpen && (
           <div 
             className="fixed inset-0 bg-black bg-opacity-25"
@@ -397,11 +410,7 @@ export default function Financial() {
             aria-hidden="true"
           ></div>
         )}
-
-        {/* Container para todos os elementos FAB */}
         <div className="relative flex flex-col-reverse items-end gap-y-3">
-        
-            {/* Botão FAB Principal */}
             <button 
                 onClick={() => setIsFabMenuOpen(!isFabMenuOpen)} 
                 className="relative z-10 bg-gradient-to-r from-pink-500 to-violet-500 text-white rounded-full p-4 shadow-lg hover:scale-110 active:scale-100 transition-all duration-300"
@@ -410,14 +419,11 @@ export default function Financial() {
             >
                 <Plus className={`w-6 h-6 transition-transform duration-300 ${isFabMenuOpen ? 'rotate-45' : ''}`} />
             </button>
-
-            {/* Container para as opções do menu */}
             <div 
                 className={`flex flex-col items-end gap-y-3 transition-all duration-300 ease-in-out ${
                     isFabMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
                 }`}
             >
-                {/* Ação: Nova Entrada */}
                 <div className="flex items-center gap-x-3">
                     <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
                         Nova Entrada
@@ -430,8 +436,6 @@ export default function Financial() {
                         <Plus className="w-5 h-5" />
                     </button>
                 </div>
-                
-                {/* Ação: Exportar PDF */}
                 <div className="flex items-center gap-x-3">
                      <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
                         Exportar PDF
@@ -444,8 +448,6 @@ export default function Financial() {
                         <FileText className="w-5 h-5" />
                     </button>
                 </div>
-                
-                {/* Ação: Exportar CSV */}
                 <div className="flex items-center gap-x-3">
                     <span className="bg-white text-gray-700 text-sm font-semibold px-3 py-1.5 rounded-md shadow-sm">
                         Exportar CSV
@@ -461,8 +463,6 @@ export default function Financial() {
             </div>
         </div>
       </div>
-      {/* --- FIM: MENU FAB CORRIGIDO PARA MOBILE --- */}
-
 
       {/* Modal de Adicionar/Editar */}
       {isModalOpen && (

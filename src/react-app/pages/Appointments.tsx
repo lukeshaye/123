@@ -9,14 +9,12 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import moment from 'moment';
-import 'moment/locale/pt-br';
 import type { AppointmentType, ProfessionalType, ClientType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
 
 // --- PrimeReact Imports ---
 import { Calendar } from 'primereact/calendar';
 import { Dropdown } from 'primereact/dropdown';
-import { addLocale } from 'primereact/api';
 import 'primereact/resources/themes/tailwind-light/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
@@ -73,21 +71,7 @@ export default function Appointments() {
   const watchedClientId = watch('client_id');
   const watchedProfessionalId = watch('professional_id');
 
-
-  useEffect(() => {
-
-    addLocale('pt', {
-      firstDayOfWeek: 1,
-      dayNames: ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'],
-      dayNamesShort: ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'],
-      dayNamesMin: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'],
-      monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
-      monthNamesShort: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
-      today: 'Hoje',
-      clear: 'Limpar',
-      weekHeader: 'Sem'
-    });
-  }, []);
+  // Removido useEffect de configuração de locale - já está configurado globalmente no main.tsx
 
   useEffect(() => {
     if (user) {
@@ -114,11 +98,9 @@ export default function Appointments() {
   }, [watchedServiceId, watchedStartDate, services, setValue]);
 
   const professionalOptions = useMemo(() => {
-    // MODIFICAÇÃO 1: A opção "Todos" não precisa mais de uma cor fixa aqui.
     const allOption = { id: null, name: 'Todos os Profissionais', user_id: '' };
     return [allOption, ...professionals];
   }, [professionals]);
-
 
   const currentDate = Array.isArray(selectedDate) ? selectedDate[0] : selectedDate;
 
@@ -245,12 +227,11 @@ export default function Appointments() {
   };
 
   // --- Templates para Dropdowns ---
-  // MODIFICAÇÃO 2: Lógica para aplicar gradiente ou cor sólida na bolinha
   const professionalOptionTemplate = (option: ProfessionalType | { id: null, name: string }) => {
     const isAllProfessionals = option.id === null;
     
     const circleStyle = isAllProfessionals
-      ? { backgroundImage: 'linear-gradient(to right, #ec4899, #8b5cf6)' } // Gradiente do projeto
+      ? { backgroundImage: 'linear-gradient(to right, #ec4899, #8b5cf6)' }
       : { backgroundColor: (option as ProfessionalType).color || '#cccccc' };
 
     return (
@@ -311,7 +292,7 @@ export default function Appointments() {
                 value={currentDate}
                 onChange={(e) => setSelectedDate(e.value as Date)}
                 touchUI
-                locale="pt"
+                locale="pt-BR"
                 dateFormat="dd/mm/yy"
                 showIcon
                 icon={<CalendarIcon className="w-5 h-5 text-gray-500" />}
@@ -336,7 +317,7 @@ export default function Appointments() {
                  <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
                  <div className="text-center">
                     <h2 className="text-lg font-semibold text-gray-800">
-    			{currentDate ? moment(currentDate).locale('pt-br').format('dddd, D [de] MMMM') : 'Selecione uma data'}
+    			{currentDate ? moment(currentDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
 		    </h2>
                     <button onClick={() => setSelectedDate(new Date())} className="text-sm text-pink-600 hover:underline">Hoje</button>
                  </div>
