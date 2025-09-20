@@ -12,6 +12,7 @@ import moment from 'moment';
 import 'moment/locale/pt-br';
 import type { AppointmentType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
+import { StyledDropdown } from '../components/StyledDropdown';
 
 // --- PrimeReact Imports ---
 import { Calendar } from 'primereact/calendar';
@@ -247,20 +248,15 @@ export default function Appointments() {
             <p className="mt-2 text-gray-600">Visualize e gerencie os seus agendamentos</p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-             <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                <select
-                  id="professional_filter"
-                  value={selectedProfessionalId ?? ''}
-                  onChange={(e) => setSelectedProfessionalId(e.target.value ? Number(e.target.value) : null)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 text-sm"
-                >
-                  <option value="">Todos os Profissionais</option>
-                  {professionals.map((prof) => (
-                    <option key={prof.id} value={prof.id!}>{prof.name}</option>
-                  ))}
-                </select>
-             </div>
+             <StyledDropdown
+    		value={professionals.find(p => p.id === selectedProfessionalId) || null}
+    		options={professionals}
+    		onChange={(professional) => setSelectedProfessionalId(professional ? professional.id! : null)}
+    		placeholder="Todos os Profissionais"
+    		optionLabel="name"
+    		icon={<User className="w-4 h-4 text-gray-400" />}
+		showClear // Permite limpar a seleção
+		/>
              
              <Calendar
                 value={currentDate}

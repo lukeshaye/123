@@ -11,13 +11,15 @@
 .p-datepicker {
     border-radius: 1rem !important; /* Bordas mais arredondadas */
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+    min-width: 380px !important; /* NOVO: Aumenta a largura mínima do painel */
+    padding: 0.5rem !important; /* NOVO: Adiciona um espaçamento interno geral */
 }
 
 /* Cabeçalho do calendário */
 .p-datepicker-header {
     background: #f8fafc !important; /* Um cinza bem claro */
     border-bottom: 1px solid #e5e7eb !important;
-    padding: 1rem !important;
+    padding: 1.25rem !important; /* ALTERADO: Aumenta o espaçamento do cabeçalho */
 }
 
 /* Título do mês e ano */
@@ -25,6 +27,7 @@
 .p-datepicker-title .p-datepicker-year {
     color: #1f2937 !important; /* Texto mais escuro */
     font-weight: 700 !important;
+    font-size: 1.125rem !important; /* ALTERADO: Aumenta o tamanho da fonte do título */
 }
 
 /* Botões de navegação */
@@ -37,12 +40,19 @@
 .p-datepicker-calendar th {
     color: #6b7280 !important;
     font-weight: 600 !important;
+    padding: 0.75rem 0 !important; /* ALTERADO: Adiciona espaçamento vertical nos dias da semana */
 }
 
-/* Células dos dias */
+/* Células dos dias - A principal alteração para aumentar a altura */
 .p-datepicker-calendar td > span {
-    border-radius: 0.5rem !important; /* Bordas arredondadas nos dias */
+    border-radius: 0.75rem !important; /* ALTERADO: Bordas mais arredondadas nos dias */
     transition: all 0.2s ease-in-out;
+    width: 44px !important;   /* NOVO: Define uma largura fixa */
+    height: 44px !important;  /* NOVO: Define uma altura fixa */
+    display: flex !important; /* NOVO: Permite centralização do conteúdo */
+    align-items: center !important; /* NOVO: Centraliza verticalmente */
+    justify-content: center !important; /* NOVO: Centraliza horizontalmente */
+    font-size: 0.95rem !important; /* NOVO: Aumenta um pouco a fonte dos números */
 }
 
 /* Dia selecionado */
