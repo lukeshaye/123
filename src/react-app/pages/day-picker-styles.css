@@ -13,7 +13,7 @@
   --rdp-today-color: #ec4899;
 
   --rdp-font-family: 'Inter', sans-serif;
-  --rdp-border-radius: 0.65rem; /* ~10px */
+  --rdp-border-radius: 0.65rem; /* ~10px, para os cantos arredondados */
 
   /* Novas variáveis para mais controle */
   --rdp-caption-color: #111827; /* gray-900 */
@@ -23,9 +23,8 @@
 }
 
 /* --- Container Geral do Modal --- */
-/* Aumentamos o padding interno do modal no wrapper */
 .calendar-modal-wrapper .bg-white {
-  padding: 1.25rem; /* 20px */
+  padding: 1.25rem; /* Aumenta o padding interno do modal */
 }
 
 /* --- Container do DayPicker --- */
@@ -39,10 +38,6 @@
 }
 
 /* --- Cabeçalho (Mês e Navegação) --- */
-.calendar-modal-wrapper .rdp-caption {
-  align-items: center;
-}
-
 .calendar-modal-wrapper .rdp-nav_button {
   display: inline-flex;
   align-items: center;
@@ -97,7 +92,7 @@
   transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
   border: none;
   position: relative;
-  font-weight: 600; /* Deixando os números mais fortes */
+  font-weight: 600; /* Números dos dias mais fortes */
   background-color: transparent;
   color: #374151; /* gray-700 */
 }
@@ -108,13 +103,10 @@
 }
 
 /* --- Estados dos Dias --- */
-
-/* Hover */
 .calendar-modal-wrapper .rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
   background-color: var(--rdp-background-color-hover) !important;
 }
 
-/* Dia Selecionado */
 .calendar-modal-wrapper .rdp-day_selected,
 .calendar-modal-wrapper .rdp-day_selected:focus-visible,
 .calendar-modal-wrapper .rdp-day_selected:hover {
@@ -123,7 +115,6 @@
   font-weight: 700;
 }
 
-/* Dia de Hoje */
 .calendar-modal-wrapper .rdp-day_today {
   font-weight: 800; /* Extra bold */
 }
@@ -133,14 +124,6 @@
   color: var(--rdp-today-color) !important;
 }
 
-/* Dias de fora do mês */
 .calendar-modal-wrapper .rdp-day_outside {
   color: var(--rdp-outside-day-color);
-}
-
-.calendar-modal-wrapper .rdp-day_disabled,
-.calendar-modal-wrapper .rdp-day_disabled:hover {
-  opacity: 0.5;
-  background-color: transparent !important;
-  cursor: default;
 }

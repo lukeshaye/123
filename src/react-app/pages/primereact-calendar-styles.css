@@ -1,0 +1,58 @@
+/* src/react-app/pages/primereact-calendar-styles.css */
+
+/* Remove a borda do input do calendário */
+.p-calendar .p-inputtext {
+    border: none !important;
+    padding: 0 !important;
+    background-color: transparent !important;
+}
+
+/* Estiliza o painel do calendário para combinar com o seu design */
+.p-datepicker {
+    border-radius: 1rem !important; /* Bordas mais arredondadas */
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Cabeçalho do calendário */
+.p-datepicker-header {
+    background: #f8fafc !important; /* Um cinza bem claro */
+    border-bottom: 1px solid #e5e7eb !important;
+    padding: 1rem !important;
+}
+
+/* Título do mês e ano */
+.p-datepicker-title .p-datepicker-month,
+.p-datepicker-title .p-datepicker-year {
+    color: #1f2937 !important; /* Texto mais escuro */
+    font-weight: 700 !important;
+}
+
+/* Botões de navegação */
+.p-datepicker-header .p-datepicker-prev,
+.p-datepicker-header .p-datepicker-next {
+    color: #4b5563 !important; /* Cinza médio */
+}
+
+/* Dias da semana */
+.p-datepicker-calendar th {
+    color: #6b7280 !important;
+    font-weight: 600 !important;
+}
+
+/* Células dos dias */
+.p-datepicker-calendar td > span {
+    border-radius: 0.5rem !important; /* Bordas arredondadas nos dias */
+    transition: all 0.2s ease-in-out;
+}
+
+/* Dia selecionado */
+.p-datepicker-calendar td > span.p-highlight {
+    background-color: #ec4899 !important; /* Rosa da sua paleta */
+    color: white !important;
+}
+
+/* Dia de hoje */
+.p-datepicker-calendar td > span.p-datepicker-today {
+    background-color: #fce7f3 !important; /* Rosa claro da sua paleta */
+    color: #ec4899 !important; /* Rosa da sua paleta */
+}

@@ -8,16 +8,18 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DayPicker, CaptionProps, useNavigation } from 'react-day-picker';
-import { ptBR } from 'date-fns/locale';
-import { format } from 'date-fns';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import type { AppointmentType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
 
-// Importa os novos estilos para o DayPicker
-import './day-picker-styles.css';
+// --- PrimeReact Imports ---
+import { Calendar } from 'primereact/calendar';
+import { addLocale } from 'primereact/api';
+import 'primereact/resources/themes/tailwind-light/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'primeicons/primeicons.css';
+import './primereact-calendar-styles.css'; // Seu CSS customizado
 
 // --- Definição de Tipos ---
 interface AppointmentFormData {
@@ -40,37 +42,6 @@ const defaultFormValues: Partial<AppointmentFormData> = {
   attended: false,
 };
 
-function CalendarCaption(props: CaptionProps) {
-  const { goToMonth, nextMonth, previousMonth } = useNavigation();
-  const monthName = format(props.displayMonth, 'MMMM yyyy', { locale: ptBR });
-  const capitalizedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-
-  return (
-    <div className="flex items-center justify-between px-1 pt-1 mb-4 rdp-caption">
-      <button
-        disabled={!previousMonth}
-        onClick={() => previousMonth && goToMonth(previousMonth)}
-        className="rdp-nav_button"
-        aria-label="Mês anterior"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <h2 className="text-base font-bold text-gray-900">
-        {capitalizedMonthName}
-      </h2>
-      <button
-        disabled={!nextMonth}
-        onClick={() => nextMonth && goToMonth(nextMonth)}
-        className="rdp-nav_button"
-        aria-label="Próximo mês"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-    </div>
-  );
-}
-
-
 // --- Componente Principal ---
 export default function Appointments() {
   const { user } = useSupabaseAuth();
@@ -82,17 +53,12 @@ export default function Appointments() {
     addAppointment, updateAppointment, deleteAppointment
   } = useAppStore();
 
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | Date[] | undefined>(new Date());
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentType | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
-
-  // Estados para o novo modal de calendário
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [tempSelectedDate, setTempSelectedDate] = useState<Date | undefined>(selectedDate);
-
 
   const {
     register, handleSubmit, reset, setValue, watch
@@ -105,8 +71,19 @@ export default function Appointments() {
   const watchedStartDate = watch('appointment_date');
 
   useEffect(() => {
-    // Configura o locale do moment globalmente ao montar o componente
     moment.locale('pt-br');
+
+    addLocale('pt', {
+      firstDayOfWeek: 1,
+      dayNames: ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'],
+      dayNamesShort: ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'],
+      dayNamesMin: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'],
+      monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+      monthNamesShort: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
+      today: 'Hoje',
+      clear: 'Limpar',
+      weekHeader: 'Sem'
+    });
   }, []);
 
   useEffect(() => {
@@ -133,17 +110,19 @@ export default function Appointments() {
     }
   }, [watchedServiceId, watchedStartDate, services, setValue]);
 
+  const currentDate = Array.isArray(selectedDate) ? selectedDate[0] : selectedDate;
+
   const filteredAppointments = useMemo(() => {
-    if (!selectedDate) return [];
+    if (!currentDate) return [];
     
     return appointments
       .filter(app => {
-        const isSameDay = moment(app.appointment_date).isSame(selectedDate, 'day');
+        const isSameDay = moment(app.appointment_date).isSame(currentDate, 'day');
         const professionalMatch = selectedProfessionalId === null || app.professional_id === selectedProfessionalId;
         return isSameDay && professionalMatch;
       })
       .sort((a, b) => new Date(a.appointment_date).getTime() - new Date(b.appointment_date).getTime());
-  }, [appointments, selectedDate, selectedProfessionalId]);
+  }, [appointments, currentDate, selectedProfessionalId]);
 
   const groupedAppointments = useMemo(() => {
     return filteredAppointments.reduce((acc, app) => {
@@ -154,21 +133,8 @@ export default function Appointments() {
     }, {} as Record<string, AppointmentType[]>);
   }, [filteredAppointments]);
   
-  // Funções para controlar o modal do calendário
-  const handleOpenCalendar = () => {
-    setTempSelectedDate(selectedDate);
-    setIsCalendarOpen(true);
-  };
-  
-  const handleApplyDate = () => {
-    if (tempSelectedDate) {
-      setSelectedDate(tempSelectedDate);
-    }
-    setIsCalendarOpen(false);
-  };
-
   const handleDayNavigation = (direction: 'prev' | 'next') => {
-      const newDate = moment(selectedDate || new Date()).add(direction === 'prev' ? -1 : 1, 'day').toDate();
+      const newDate = moment(currentDate || new Date()).add(direction === 'prev' ? -1 : 1, 'day').toDate();
       setSelectedDate(newDate);
   }
 
@@ -186,7 +152,7 @@ export default function Appointments() {
       });
     } else {
       setEditingAppointment(null);
-      const initialDate = slotDate || selectedDate || new Date();
+      const initialDate = slotDate || currentDate || new Date();
       reset({
           ...defaultFormValues,
           appointment_date: moment(initialDate).format('YYYY-MM-DDTHH:mm'),
@@ -275,7 +241,6 @@ export default function Appointments() {
   return (
     <Layout>
       <div className="px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
-        {/* ... (código do cabeçalho da página principal - inalterado) ... */}
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Agenda</h1>
@@ -283,7 +248,7 @@ export default function Appointments() {
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                 <select
                   id="professional_filter"
                   value={selectedProfessionalId ?? ''}
@@ -296,15 +261,18 @@ export default function Appointments() {
                   ))}
                 </select>
              </div>
-
-            <button
-              type="button"
-              onClick={handleOpenCalendar}
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              <CalendarIcon className="w-4 h-4 mr-2" />
-              {selectedDate ? moment(selectedDate).format('DD/MM/YYYY') : 'Selecionar Data'}
-            </button>
+             
+             <Calendar
+                value={currentDate}
+                onChange={(e) => setSelectedDate(e.value as Date)}
+                touchUI
+                locale="pt"
+                dateFormat="dd/mm/yy"
+                showIcon
+                icon={<CalendarIcon className="w-4 h-4 text-gray-600" />}
+                buttonClassName="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                inputClassName="hidden" 
+             />
 
             <button
               type="button"
@@ -317,7 +285,6 @@ export default function Appointments() {
           </div>
         </div>
         
-        {/* ... (código da timeline de agendamentos - inalterado) ... */}
         <div className="mt-8">
           <div className="lg:col-span-12">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 min-h-[60vh]">
@@ -325,7 +292,7 @@ export default function Appointments() {
                  <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
                  <div className="text-center">
                     <h2 className="text-lg font-semibold text-gray-800 capitalize">
-                        {selectedDate ? moment(selectedDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
+                        {currentDate ? moment(currentDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
                     </h2>
                     <button onClick={() => setSelectedDate(new Date())} className="text-sm text-pink-600 hover:underline">Hoje</button>
                  </div>
@@ -389,60 +356,6 @@ export default function Appointments() {
           </div>
         </div>
 
-        {/* Modal do Calendário (ATUALIZADO) */}
-        {isCalendarOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-60 backdrop-blur-sm calendar-modal-wrapper"
-            onClick={() => setIsCalendarOpen(false)}
-          >
-            <div 
-              className="bg-white p-6 rounded-2xl shadow-xl transform transition-all sm:w-full sm:max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-               <DayPicker
-    mode="single"
-    selected={tempSelectedDate}
-    onSelect={setTempSelectedDate}
-    locale={ptBR}
-    showOutsideDays
-    fixedWeeks
-    components={{ Caption: CalendarCaption }}
-    formatters={{
-        // A inspiração usa o padrão "S M T W T F S"
-        // Para isso, criamos um formatador customizado.
-        formatWeekdayName: (day, options) => {
-            const weekday = format(day, 'ccc', { locale: options?.locale }).charAt(0);
-            // Para o português, o padrão é D S T Q Q S S, vamos ajustar
-            // se o dia for "domingo", o resultado de charAt(0) será "d", trocamos para "S"
-            // para corresponder à inspiração (Sunday)
-            if (format(day, 'ccc', { locale: options?.locale }) === 'dom.') {
-                return 'S';
-            }
-            return weekday.toUpperCase();
-        }
-    }}
-/>
-                <div className="mt-6 flex justify-end gap-x-3">
-                    <button 
-                        type="button" 
-                        onClick={() => setIsCalendarOpen(false)}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-                    >
-                        Cancelar
-                    </button>
-                    <button 
-                        type="button" 
-                        onClick={handleApplyDate}
-                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-pink-500 to-violet-500 border border-transparent rounded-md shadow-sm hover:from-pink-600 hover:to-violet-600"
-                    >
-                        Aplicar
-                    </button>
-                </div>
-            </div>
-          </div>
-        )}
-
-        {/* ... (Modal de Adicionar/Editar e outros - inalterados) ... */}
         {isModalOpen && (
            <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -535,7 +448,6 @@ export default function Appointments() {
             <Plus className="w-6 h-6" />
           </button>
         </div>
-
       </div>
     </Layout>
   );
