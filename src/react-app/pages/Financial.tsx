@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form'; // Importar o Controller
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
 import { supabase } from '../supabaseClient';
@@ -27,6 +27,16 @@ import { CreateFinancialEntrySchema } from '../../shared/types';
 import { formatCurrency, formatDate } from '../utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import moment from 'moment';
+
+// --- PrimeReact Imports ---
+import { Calendar } from 'primereact/calendar';
+import { Dropdown } from 'primereact/dropdown';
+import 'primereact/resources/themes/tailwind-light/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'primeicons/primeicons.css';
+import './primereact-calendar-styles.css';
+
 
 // --- Interfaces e Tipos ---
 interface FinancialFormData {
@@ -34,7 +44,7 @@ interface FinancialFormData {
     amount: number | null;
     type: 'receita' | 'despesa';
     entry_type: 'pontual' | 'fixa';
-    entry_date: string;
+    entry_date: Date | string;
 }
 
 const defaultFormValues: FinancialFormData = {
@@ -42,8 +52,20 @@ const defaultFormValues: FinancialFormData = {
     amount: null,
     type: 'receita',
     entry_type: 'pontual',
-    entry_date: new Date().toISOString().split('T')[0],
+    entry_date: new Date(),
 };
+
+// --- Opções para os Dropdowns ---
+const typeOptions = [
+  { label: 'Receita', value: 'receita' },
+  { label: 'Despesa', value: 'despesa' },
+];
+
+const frequencyOptions = [
+  { label: 'Pontual', value: 'pontual' },
+  { label: 'Fixa', value: 'fixa' },
+];
+
 
 // --- Componente Principal ---
 export default function Financial() {
@@ -62,7 +84,7 @@ export default function Financial() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState<'all' | 'receita' | 'despesa'>('all');
   const [frequencyFilter, setFrequencyFilter] = useState<'all' | 'pontual' | 'fixa'>('all');
-  
+
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false);
 
   const [kpis, setKpis] = useState({
@@ -72,7 +94,7 @@ export default function Financial() {
   });
 
   const {
-    register,
+    control, // Usar 'control' para o Controller
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -157,10 +179,14 @@ export default function Financial() {
   const handleNextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   const handleCurrentMonth = () => setCurrentDate(new Date());
 
-  const onSubmit = async (formData: Omit<FinancialFormData, 'amount'> & { amount: number }) => {
-    if (!user) return;
+  const onSubmit = async (formData: FinancialFormData) => {
+    if (!user || formData.amount === null) return;
     setError(null);
-    const entryData = { ...formData, amount: Math.round(formData.amount * 100) };
+    const entryData = { 
+        ...formData, 
+        amount: Math.round(formData.amount * 100),
+        entry_date: moment(formData.entry_date).format('YYYY-MM-DD') // Formata a data
+    };
 
     try {
       if (editingEntry) {
@@ -202,7 +228,11 @@ export default function Financial() {
 
   const handleEditEntry = (entry: FinancialEntryType) => {
     setEditingEntry(entry);
-    reset({ ...entry, amount: entry.amount / 100, entry_date: entry.entry_date.split('T')[0] });
+    reset({ 
+        ...entry, 
+        amount: entry.amount / 100, 
+        entry_date: new Date(entry.entry_date + 'T00:00:00') // Converte para objeto Date
+    });
     setIsModalOpen(true);
   };
 
@@ -287,6 +317,7 @@ export default function Financial() {
   return (
     <Layout>
       <div className="px-4 sm:px-6 lg:px-8 pb-24 lg:pb-8">
+        {/* Cabeçalho e KPIs (sem alteração) */}
         <div className="sm:flex sm:items-center sm:justify-between">
           <div className="sm:flex-auto">
             <h1 className="text-3xl font-bold text-gray-900">Financeiro</h1>
@@ -313,6 +344,7 @@ export default function Financial() {
             <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200 p-5"><div className="flex items-center"><div className="flex-shrink-0"><div className="bg-blue-100 rounded-md p-3"><DollarSign className="h-6 w-6 text-blue-600" /></div></div><div className="ml-5 w-0 flex-1"><dl><dt className="text-sm font-medium text-gray-500 truncate">Lucro Líquido</dt><dd className="text-lg font-semibold text-gray-900">{formatCurrency(kpis.netProfit)}</dd></dl></div></div></div>
         </div>
 
+        {/* Lista de Lançamentos (sem alteração) */}
         <div className="mt-8">
             <div className="bg-white shadow-sm rounded-lg border border-gray-200">
                 <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
@@ -401,7 +433,7 @@ export default function Financial() {
         </div>
       </div>
       
-      {/* --- MENU FAB CORRIGIDO PARA MOBILE --- */}
+      {/* Menu FAB (sem alteração) */}
       <div className="lg:hidden fixed bottom-6 right-6 z-40">
         {isFabMenuOpen && (
           <div 
@@ -464,7 +496,9 @@ export default function Financial() {
         </div>
       </div>
 
-       {/* Modal de Adicionar/Editar */}
+       {/* ======================================================= */}
+       {/* --- INÍCIO DA SEÇÃO DO MODAL ATUALIZADO --- */}
+       {/* ======================================================= */}
        {isModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -483,37 +517,96 @@ export default function Financial() {
                     </div>
                   )}
                   <div className="space-y-4">
+                    
+                    {/* Campo Descrição (sem alteração) */}
                     <div>
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700">Descrição *</label>
-                      <input type="text" {...register('description')} placeholder="Ex: Venda de produto X" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
+                      <Controller
+                          name="description"
+                          control={control}
+                          rules={{ required: 'Descrição é obrigatória' }}
+                          render={({ field }) => (
+                            <input {...field} id="description" type="text" placeholder="Ex: Venda de produto X" className="p-inputtext p-component w-full" />
+                          )}
+                      />
                       {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>}
                     </div>
+                    
+                    {/* Campo Valor (sem alteração) */}
                     <div>
-                      <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Valor (R$) *</label>
-                      <input type="number" step="0.01" {...register('amount', { valueAsNumber: true })} placeholder="150,00" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                      <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">Valor (R$) *</label>
+                      <Controller
+                          name="amount"
+                          control={control}
+                          rules={{ required: 'Valor é obrigatório' }}
+                          render={({ field }) => (
+                            <input {...field} id="amount" value={field.value ?? ''} type="number" step="0.01" placeholder="150,00" className="p-inputtext p-component w-full" />
+                          )}
+                      />
                       {errors.amount && <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>}
                     </div>
+                    
+                    {/* Campo Tipo (ATUALIZADO PARA DROPDOWN) */}
                     <div>
-                      <label htmlFor="type" className="block text-sm font-medium text-gray-700">Tipo *</label>
-                      <select {...register('type')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
-                        <option value="receita">Receita</option>
-                        <option value="despesa">Despesa</option>
-                      </select>
-                      {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>}
+                      <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                      <Controller
+                          name="type"
+                          control={control}
+                          render={({ field }) => (
+                            <Dropdown 
+                                id={field.name}
+                                value={field.value} 
+                                options={typeOptions} 
+                                onChange={(e) => field.onChange(e.value)} 
+                                placeholder="Selecione o tipo"
+                                className="w-full" 
+                            />
+                          )}
+                      />
+                       {errors.type && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>}
                     </div>
+
+                    {/* Campo Frequência (ATUALIZADO PARA DROPDOWN) */}
                     <div>
-                      <label htmlFor="entry_type" className="block text-sm font-medium text-gray-700">Frequência *</label>
-                      <select {...register('entry_type')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
-                        <option value="pontual">Pontual</option>
-                        <option value="fixa">Fixa</option>
-                      </select>
+                      <label htmlFor="entry_type" className="block text-sm font-medium text-gray-700 mb-1">Frequência *</label>
+                       <Controller
+                          name="entry_type"
+                          control={control}
+                          render={({ field }) => (
+                            <Dropdown 
+                                id={field.name}
+                                value={field.value} 
+                                options={frequencyOptions} 
+                                onChange={(e) => field.onChange(e.value)} 
+                                placeholder="Selecione a frequência"
+                                className="w-full" 
+                            />
+                          )}
+                      />
                       {errors.entry_type && <p className="mt-1 text-sm text-red-600">{errors.entry_type.message}</p>}
                     </div>
+
+                    {/* Campo Data (ATUALIZADO PARA CALENDAR) */}
                     <div>
-                      <label htmlFor="entry_date" className="block text-sm font-medium text-gray-700">Data *</label>
-                      <input type="date" {...register('entry_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                      <label htmlFor="entry_date" className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
+                      <Controller
+                          name="entry_date"
+                          control={control}
+                          render={({ field }) => (
+                             <Calendar 
+                                id={field.name}
+                                value={field.value ? new Date(field.value) : null}
+                                onChange={(e) => field.onChange(e.value)} 
+                                dateFormat="dd/mm/yy"
+                                className="w-full"
+                                inputClassName="w-full"
+                                showIcon
+                             />
+                          )}
+                      />
                       {errors.entry_date && <p className="mt-1 text-sm text-red-600">{errors.entry_date.message}</p>}
                     </div>
+
                   </div>
                 </div>
                 <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
@@ -529,8 +622,11 @@ export default function Financial() {
           </div>
         </div>
       )}
+       {/* ======================================================= */}
+       {/* --- FIM DA SEÇÃO DO MODAL ATUALIZADO --- */}
+       {/* ======================================================= */}
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* Modal de Confirmação de Exclusão (sem alteração) */}
       <ConfirmationModal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} onConfirm={handleDeleteConfirm} title="Excluir Entrada Financeira" message={`Tem certeza que deseja excluir a entrada "${entryToDelete?.description}"? Esta ação não pode ser desfeita.`} confirmText="Excluir" cancelText="Cancelar" variant="danger" isLoading={isDeleting} />
     </Layout>
   );
