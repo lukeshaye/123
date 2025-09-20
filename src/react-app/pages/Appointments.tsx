@@ -9,7 +9,6 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import moment from 'moment';
-import 'moment/locale/pt-br';
 import type { AppointmentType, ProfessionalType, ClientType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
 
