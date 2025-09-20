@@ -86,6 +86,9 @@ export default function Appointments() {
       clear: 'Limpar',
       weekHeader: 'Sem'
     });
+
+    moment.locale('pt-br');
+
   }, []);
 
   useEffect(() => {
