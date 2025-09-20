@@ -75,7 +75,6 @@ export default function Appointments() {
 
 
   useEffect(() => {
-    moment.locale('pt-br');
 
     addLocale('pt', {
       firstDayOfWeek: 1,
