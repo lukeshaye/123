@@ -66,3 +66,36 @@
     background-color: #fce7f3 !important; /* Rosa claro da sua paleta */
     color: #ec4899 !important; /* Rosa da sua paleta */
 }
+/* Adicionado para customizar o botão do ícone do calendário */
+.p-datepicker-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: white !important;
+    border: 1px solid #d1d5db !important; /* Cor cinza-300 do Tailwind */
+    border-radius: 0.375rem !important; /* rounded-md do Tailwind */
+    padding: 0.625rem !important; /* Equivalente ao p-2.5 para um bom tamanho */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important; /* shadow-sm do Tailwind */
+    transition: background-color 0.2s;
+}
+
+/* Efeito Hover */
+.p-datepicker-trigger:hover {
+    background-color: #f9fafb !important; /* Cor gray-50 do Tailwind */
+}
+
+/* Remove a borda de foco padrão e usa a do tema */
+.p-datepicker-trigger:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #ec4899, 0 1px 2px 0 rgb(0 0 0 / 0.05) !important; /* Foco rosa, como nos outros botões */
+}
+/* Adicionado para customizar a borda e o foco do Dropdown */
+.p-dropdown {
+    border: 1px solid #d1d5db !important; /* Cor cinza-300 do Tailwind */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important; /* shadow-sm do Tailwind */
+}
+
+/* Estilo do foco para combinar com os outros elementos */
+.p-dropdown.p-focus {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #ec4899, 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+}

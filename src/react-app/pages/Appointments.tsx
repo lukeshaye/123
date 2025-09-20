@@ -7,20 +7,20 @@ import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToastHelpers } from '../contexts/ToastContext';
-import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import moment from 'moment';
 import 'moment/locale/pt-br';
-import type { AppointmentType } from '../../shared/types';
+import type { AppointmentType, ProfessionalType, ClientType, ServiceType } from '../../shared/types';
 import { AppointmentFormSchema } from '../../shared/types';
-import { StyledDropdown } from '../components/StyledDropdown';
 
 // --- PrimeReact Imports ---
 import { Calendar } from 'primereact/calendar';
+import { Dropdown } from 'primereact/dropdown';
 import { addLocale } from 'primereact/api';
 import 'primereact/resources/themes/tailwind-light/theme.css';
 import 'primereact/resources/primereact.min.css';
 import 'primeicons/primeicons.css';
-import './primereact-calendar-styles.css'; // Seu CSS customizado
+import './primereact-calendar-styles.css';
 
 // --- Definição de Tipos ---
 interface AppointmentFormData {
@@ -62,7 +62,7 @@ export default function Appointments() {
   const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
 
   const {
-    register, handleSubmit, reset, setValue, watch
+    register, handleSubmit, reset, setValue, watch, formState: { errors }
   } = useForm<AppointmentFormData>({
     resolver: zodResolver(AppointmentFormSchema) as any,
     defaultValues: defaultFormValues,
@@ -70,6 +70,9 @@ export default function Appointments() {
 
   const watchedServiceId = watch('service_id');
   const watchedStartDate = watch('appointment_date');
+  const watchedClientId = watch('client_id');
+  const watchedProfessionalId = watch('professional_id');
+
 
   useEffect(() => {
     moment.locale('pt-br');
@@ -110,6 +113,13 @@ export default function Appointments() {
       }
     }
   }, [watchedServiceId, watchedStartDate, services, setValue]);
+
+  const professionalOptions = useMemo(() => {
+    // MODIFICAÇÃO 1: A opção "Todos" não precisa mais de uma cor fixa aqui.
+    const allOption = { id: null, name: 'Todos os Profissionais', user_id: '' };
+    return [allOption, ...professionals];
+  }, [professionals]);
+
 
   const currentDate = Array.isArray(selectedDate) ? selectedDate[0] : selectedDate;
 
@@ -235,6 +245,45 @@ export default function Appointments() {
     }
   };
 
+  // --- Templates para Dropdowns ---
+  // MODIFICAÇÃO 2: Lógica para aplicar gradiente ou cor sólida na bolinha
+  const professionalOptionTemplate = (option: ProfessionalType | { id: null, name: string }) => {
+    const isAllProfessionals = option.id === null;
+    
+    const circleStyle = isAllProfessionals
+      ? { backgroundImage: 'linear-gradient(to right, #ec4899, #8b5cf6)' } // Gradiente do projeto
+      : { backgroundColor: (option as ProfessionalType).color || '#cccccc' };
+
+    return (
+        <div className="flex items-center">
+            <div 
+                className="w-4 h-4 rounded-full mr-2 flex-shrink-0" 
+                style={circleStyle} 
+            />
+            <span>{option.name}</span>
+        </div>
+    );
+  };
+  
+  const selectedProfessionalTemplate = (option: ProfessionalType | null, props) => {
+      if (!option || option.id === null) return <span>{props.placeholder}</span>;
+      return professionalOptionTemplate(option);
+  };
+  
+  const clientOptionTemplate = (option: ClientType) => (
+    <div className="flex items-center">
+        <User className="w-4 h-4 mr-2 text-gray-400" />
+        <span>{option.name}</span>
+    </div>
+  );
+
+  const serviceOptionTemplate = (option: ServiceType) => (
+    <div className="flex items-center">
+        <Scissors className="w-4 h-4 mr-2 text-gray-400" />
+        <span>{option.name}</span>
+    </div>
+  );
+
   if (loading.clients || loading.professionals || loading.services || loading.appointments) {
     return <Layout><LoadingSpinner /></Layout>;
   }
@@ -248,15 +297,16 @@ export default function Appointments() {
             <p className="mt-2 text-gray-600">Visualize e gerencie os seus agendamentos</p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-             <StyledDropdown
-    		value={professionals.find(p => p.id === selectedProfessionalId) || null}
-    		options={professionals}
-    		onChange={(professional) => setSelectedProfessionalId(professional ? professional.id! : null)}
-    		placeholder="Todos os Profissionais"
-    		optionLabel="name"
-    		icon={<User className="w-4 h-4 text-gray-400" />}
-		showClear // Permite limpar a seleção
-		/>
+             <Dropdown
+                value={professionalOptions.find(p => p.id === selectedProfessionalId) || professionalOptions[0]}
+                options={professionalOptions} 
+                onChange={(e) => setSelectedProfessionalId(e.value ? e.value.id : null)}
+                optionLabel="name"
+                placeholder="Todos os Profissionais"
+                valueTemplate={selectedProfessionalTemplate}
+                itemTemplate={professionalOptionTemplate}
+                className="w-full md:w-56"
+             />
              
              <Calendar
                 value={currentDate}
@@ -265,8 +315,7 @@ export default function Appointments() {
                 locale="pt"
                 dateFormat="dd/mm/yy"
                 showIcon
-                icon={<CalendarIcon className="w-4 h-4 text-gray-600" />}
-                buttonClassName="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                icon={<CalendarIcon className="w-5 h-5 text-gray-500" />}
                 inputClassName="hidden" 
              />
 
@@ -364,30 +413,25 @@ export default function Appointments() {
                        <button type="button" onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
                      </div>
                      <div className="space-y-4">
-                       <div>
-                         <label htmlFor="client_id" className="block text-sm font-medium text-gray-700">Cliente *</label>
-                         <select {...register('client_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
-                           <option value="">Selecione um cliente</option>
-                           {clients.map((client) => ( <option key={client.id} value={client.id!}>{client.name}</option> ))}
-                         </select>
-                       </div>
                         <div>
-                         <label htmlFor="professional_id" className="block text-sm font-medium text-gray-700">Profissional *</label>
-                         <select {...register('professional_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
-                           <option value="">Selecione um profissional</option>
-                           {professionals.map((prof) => (<option key={prof.id} value={prof.id!}>{prof.name}</option>))}
-                         </select>
-                       </div>
-                       <div>
-                         <label htmlFor="service_id" className="block text-sm font-medium text-gray-700">Serviço *</label>
-                          <select {...register('service_id', { valueAsNumber: true })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm">
-                           <option value="">Selecione um serviço</option>
-                           {services.map((service) => (<option key={service.id} value={service.id!}>{service.name}</option>))}
-                         </select>
-                       </div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
+                          <Dropdown value={clients.find(c => c.id === watchedClientId) || null} options={clients} onChange={(e) => setValue('client_id', e.value?.id)} optionLabel="name" placeholder="Selecione um cliente" itemTemplate={clientOptionTemplate} className="w-full" filter />
+                          {errors.client_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Profissional *</label>
+                          <Dropdown value={professionals.find(p => p.id === watchedProfessionalId) || null} options={professionals} onChange={(e) => setValue('professional_id', e.value?.id)} optionLabel="name" placeholder="Selecione um profissional" valueTemplate={selectedProfessionalTemplate} itemTemplate={professionalOptionTemplate} className="w-full" />
+                          {errors.professional_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Serviço *</label>
+                          <Dropdown value={services.find(s => s.id === watchedServiceId) || null} options={services} onChange={(e) => setValue('service_id', e.value?.id)} optionLabel="name" placeholder="Selecione um serviço" itemTemplate={serviceOptionTemplate} className="w-full" filter />
+                           {errors.service_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                        </div>
                        <div>
                          <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço (R$) *</label>
                          <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} placeholder="50,00" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                         {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>}
                        </div>
                        <div className="grid grid-cols-2 gap-4">
                           <div>
