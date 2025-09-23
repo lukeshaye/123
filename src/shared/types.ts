@@ -20,7 +20,6 @@ export const ProfessionalSchema = z.object({
   id: z.number().optional(),
   user_id: z.string(),
   name: z.string().min(1, "Nome do profissional é obrigatório"),
-  // NOVO: Campo para a cor associada ao profissional
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Formato de cor inválido. Use hexadecimal, ex: #RRGGBB").optional().nullable(),
 });
 export const CreateProfessionalSchema = ProfessionalSchema.omit({ id: true, user_id: true });
@@ -36,7 +35,6 @@ export const ServiceSchema = z.object({
   description: z.string().optional().nullable(),
   price: z.number().positive("O preço deve ser um número positivo"),
   duration: z.number().int().positive("A duração deve ser um número inteiro positivo (em minutos)"),
-  // NOVO: Campo para a cor associada ao serviço
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Formato de cor inválido. Use hexadecimal, ex: #RRGGBB").optional().nullable(),
 });
 export const CreateServiceSchema = ServiceSchema.omit({ id: true, user_id: true });
@@ -59,41 +57,36 @@ export const CreateProductSchema = ProductSchema.omit({ id: true, user_id: true 
 });
 
 // =================================================================
-// --- Schemas de Agendamentos (Atualizado com service_id) ---
+// --- Schemas de Agendamentos (Atualizado com z.date) ---
 // =================================================================
-const BaseAppointmentSchema = z.object({
+// Este schema é para o tipo completo, usado na aplicação
+export const AppointmentSchema = z.object({
   id: z.number().optional(),
   user_id: z.string(),
-  client_id: z.number({ required_error: "Cliente é obrigatório." }).min(1, "Cliente é obrigatório."),
-  professional_id: z.number({ required_error: "Profissional é obrigatório." }).min(1, "Profissional é obrigatório."),
-  service_id: z.number({ required_error: "Serviço é obrigatório." }).min(1, "Serviço é obrigatório."),
-  client_name: z.string(), // Será preenchido a partir do client_id
-  service: z.string(),     // Será preenchido a partir do service_id
-  price: z.number().positive("Preço deve ser positivo"),
-  appointment_date: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Data de início inválida" }),
-  end_date: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Data de fim inválida" }),
+  client_id: z.number(),
+  professional_id: z.number(),
+  service_id: z.number(),
+  client_name: z.string(),
+  service: z.string(),
+  price: z.number(),
+  appointment_date: z.string(), // Mantém como string aqui pois vem do DB
+  end_date: z.string(),         // Mantém como string aqui pois vem do DB
   attended: z.boolean().default(false),
 });
 
-const dateRefinement = {
+// ✅ ESTE É O SCHEMA CORRIGIDO PARA O FORMULÁRIO
+export const AppointmentFormSchema = z.object({
+  client_id: z.number({ required_error: "Cliente é obrigatório." }).min(1, "Cliente é obrigatório."),
+  professional_id: z.number({ required_error: "Profissional é obrigatório." }).min(1, "Profissional é obrigatório."),
+  service_id: z.number({ required_error: "Serviço é obrigatório." }).min(1, "Serviço é obrigatório."),
+  price: z.number().positive("Preço deve ser positivo"),
+  appointment_date: z.date({ required_error: "A data de início é obrigatória." }),
+  end_date: z.date({ required_error: "A data de fim é obrigatória." }),
+  attended: z.boolean().default(false).optional(),
+}).refine((data) => data.end_date > data.appointment_date, {
   message: "A data de fim deve ser posterior à data de início",
   path: ["end_date"],
-};
-
-export const AppointmentSchema = BaseAppointmentSchema.refine(
-  (data) => new Date(data.end_date) > new Date(data.appointment_date),
-  dateRefinement
-);
-
-export const AppointmentFormSchema = BaseAppointmentSchema.omit({
-  id: true,
-  user_id: true,
-  client_name: true,
-  service: true,
-}).refine(
-  (data) => new Date(data.end_date) > new Date(data.appointment_date),
-  dateRefinement
-);
+});
 
 
 // =================================================================

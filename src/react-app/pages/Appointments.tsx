@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useSupabaseAuth } from '../auth/SupabaseAuthProvider';
 import { useAppStore } from '../../shared/store';
@@ -26,8 +26,8 @@ interface AppointmentFormData {
   professional_id: number;
   service_id: number;
   price: number;
-  appointment_date: string;
-  end_date: string;
+  appointment_date: Date; // Alterado para Date
+  end_date: Date;         // Alterado para Date
   attended?: boolean;
 }
 
@@ -36,8 +36,8 @@ const defaultFormValues: Partial<AppointmentFormData> = {
   professional_id: undefined,
   service_id: undefined,
   price: undefined,
-  appointment_date: '',
-  end_date: '',
+  appointment_date: new Date(),
+  end_date: new Date(),
   attended: false,
 };
 
@@ -60,9 +60,10 @@ export default function Appointments() {
   const [appointmentToDelete, setAppointmentToDelete] = useState<AppointmentType | null>(null);
 
   const {
-    register, handleSubmit, reset, setValue, watch, formState: { errors }
+    register, handleSubmit, reset, setValue, watch, control,
+    formState: { errors }
   } = useForm<AppointmentFormData>({
-    resolver: zodResolver(AppointmentFormSchema) as any,
+    resolver: zodResolver(AppointmentFormSchema),
     defaultValues: defaultFormValues,
   });
 
@@ -70,8 +71,6 @@ export default function Appointments() {
   const watchedStartDate = watch('appointment_date');
   const watchedClientId = watch('client_id');
   const watchedProfessionalId = watch('professional_id');
-
-  // Removido useEffect de configuração de locale - já está configurado globalmente no main.tsx
 
   useEffect(() => {
     if (user) {
@@ -90,7 +89,7 @@ export default function Appointments() {
       if (selectedService) {
         setValue('price', selectedService.price / 100);
         if (watchedStartDate) {
-          const newEndDate = moment(watchedStartDate).add(selectedService.duration, 'minutes').format('YYYY-MM-DDTHH:mm');
+          const newEndDate = moment(watchedStartDate).add(selectedService.duration, 'minutes').toDate();
           setValue('end_date', newEndDate);
         }
       }
@@ -138,18 +137,21 @@ export default function Appointments() {
         professional_id: appointment.professional_id,
         service_id: appointment.service_id,
         price: appointment.price / 100,
-        appointment_date: moment(appointment.appointment_date).format('YYYY-MM-DDTHH:mm'),
-        end_date: moment(appointment.end_date).format('YYYY-MM-DDTHH:mm'),
+        appointment_date: new Date(appointment.appointment_date),
+        end_date: new Date(appointment.end_date),
         attended: appointment.attended,
       });
     } else {
       setEditingAppointment(null);
       const initialDate = slotDate || currentDate || new Date();
       reset({
-          ...defaultFormValues,
-          appointment_date: moment(initialDate).format('YYYY-MM-DDTHH:mm'),
-          end_date: moment(initialDate).add(30, 'minutes').format('YYYY-MM-DDTHH:mm'),
+          client_id: undefined,
           professional_id: selectedProfessionalId ?? undefined,
+          service_id: undefined,
+          price: undefined,
+          attended: false,
+          appointment_date: moment(initialDate).toDate(),
+          end_date: moment(initialDate).add(30, 'minutes').toDate(),
       });
     }
     setIsModalOpen(true);
@@ -184,8 +186,11 @@ export default function Appointments() {
          showError("Dados inválidos.", "Cliente, profissional ou serviço não encontrado.");
          return;
      }
+     // ✅ CORREÇÃO APLICADA AQUI
      const appointmentData = {
        ...data,
+       appointment_date: newStart.toISOString(),
+       end_date: newEnd.toISOString(),
        price: Math.round(Number(data.price) * 100),
        client_id: Number(data.client_id),
        professional_id: professionalId,
@@ -317,8 +322,8 @@ export default function Appointments() {
                  <button onClick={() => handleDayNavigation('prev')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronLeft className="w-5 h-5"/></button>
                  <div className="text-center">
                     <h2 className="text-lg font-semibold text-gray-800">
-    			{currentDate ? moment(currentDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
-		    </h2>
+    			      {currentDate ? moment(currentDate).format('dddd, D [de] MMMM') : 'Selecione uma data'}
+		            </h2>
                     <button onClick={() => setSelectedDate(new Date())} className="text-sm text-pink-600 hover:underline">Hoje</button>
                  </div>
                  <button onClick={() => handleDayNavigation('next')} className="p-2 rounded-full hover:bg-gray-100 transition-colors"><ChevronRight className="w-5 h-5"/></button>
@@ -396,31 +401,67 @@ export default function Appointments() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Cliente *</label>
                           <Dropdown value={clients.find(c => c.id === watchedClientId) || null} options={clients} onChange={(e) => setValue('client_id', e.value?.id)} optionLabel="name" placeholder="Selecione um cliente" itemTemplate={clientOptionTemplate} className="w-full" filter />
-                          {errors.client_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                          {errors.client_id && <p className="mt-1 text-sm text-red-600">{errors.client_id.message}</p>}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Profissional *</label>
                           <Dropdown value={professionals.find(p => p.id === watchedProfessionalId) || null} options={professionals} onChange={(e) => setValue('professional_id', e.value?.id)} optionLabel="name" placeholder="Selecione um profissional" valueTemplate={selectedProfessionalTemplate} itemTemplate={professionalOptionTemplate} className="w-full" />
-                          {errors.professional_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                          {errors.professional_id && <p className="mt-1 text-sm text-red-600">{errors.professional_id.message}</p>}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Serviço *</label>
                           <Dropdown value={services.find(s => s.id === watchedServiceId) || null} options={services} onChange={(e) => setValue('service_id', e.value?.id)} optionLabel="name" placeholder="Selecione um serviço" itemTemplate={serviceOptionTemplate} className="w-full" filter />
-                           {errors.service_id && <p className="mt-1 text-sm text-red-600">Este campo é obrigatório.</p>}
+                           {errors.service_id && <p className="mt-1 text-sm text-red-600">{errors.service_id.message}</p>}
                         </div>
                        <div>
                          <label htmlFor="price" className="block text-sm font-medium text-gray-700">Preço (R$) *</label>
                          <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} placeholder="50,00" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
                          {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>}
                        </div>
+                       
                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                           <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700">Início *</label>
-                           <input type="datetime-local" {...register('appointment_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                           <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700 mb-1">Início *</label>
+                           <Controller
+                                name="appointment_date"
+                                control={control}
+                                render={({ field }) => (
+                                    <Calendar
+                                        id={field.name}
+                                        value={field.value}
+                                        onChange={(e) => field.onChange(e.value)}
+                                        showTime
+                                        hourFormat="24"
+                                        dateFormat="dd/mm/yy"
+                                        className="w-full"
+                                        placeholder="DD/MM/AAAA HH:mm"
+                                        locale="pt-BR"
+                                    />
+                                )}
+                            />
+                           {errors.appointment_date && <p className="mt-1 text-sm text-red-600">{errors.appointment_date.message}</p>}
                          </div>
                          <div>
-                           <label htmlFor="end_date" className="block text-sm font-medium text-gray-700">Fim *</label>
-                           <input type="datetime-local" {...register('end_date')} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-pink-500 focus:border-pink-500 sm:text-sm" />
+                           <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 mb-1">Fim *</label>
+                            <Controller
+                                name="end_date"
+                                control={control}
+                                render={({ field }) => (
+                                    <Calendar
+                                        id={field.name}
+                                        value={field.value}
+                                        onChange={(e) => field.onChange(e.value)}
+                                        showTime
+                                        hourFormat="24"
+                                        dateFormat="dd/mm/yy"
+                                        className="w-full"
+                                        placeholder="DD/MM/AAAA HH:mm"
+                                        locale="pt-BR"
+                                        minDate={watchedStartDate}
+                                    />
+                                )}
+                            />
+                           {errors.end_date && <p className="mt-1 text-sm text-red-600">{errors.end_date.message}</p>}
                          </div>
                        </div>
                      </div>
