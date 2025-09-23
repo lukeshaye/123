@@ -6,6 +6,7 @@ import { useAppStore } from '../../shared/store';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { TimeSlotPicker } from '../components/TimeSlotPicker'; // <-- 1. IMPORTADO
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import moment from 'moment';
@@ -26,8 +27,8 @@ interface AppointmentFormData {
   professional_id: number;
   service_id: number;
   price: number;
-  appointment_date: Date; // Alterado para Date
-  end_date: Date;         // Alterado para Date
+  appointment_date: Date;
+  end_date: Date;
   attended?: boolean;
 }
 
@@ -72,6 +73,12 @@ export default function Appointments() {
   const watchedClientId = watch('client_id');
   const watchedProfessionalId = watch('professional_id');
 
+  // <-- 2. WATCH PARA OBTER O SERVIÇO E DURAÇÃO
+  const selectedService = useMemo(() => {
+    return services.find(s => s.id === Number(watchedServiceId));
+  }, [watchedServiceId, services]);
+  const serviceDuration = selectedService?.duration || 30;
+
   useEffect(() => {
     if (user) {
       Promise.all([
@@ -84,17 +91,14 @@ export default function Appointments() {
   }, [user, fetchClients, fetchProfessionals, fetchServices, fetchAppointments]);
   
   useEffect(() => {
-    if (watchedServiceId && services.length > 0) {
-      const selectedService = services.find(s => s.id === Number(watchedServiceId));
-      if (selectedService) {
-        setValue('price', selectedService.price / 100);
-        if (watchedStartDate) {
-          const newEndDate = moment(watchedStartDate).add(selectedService.duration, 'minutes').toDate();
-          setValue('end_date', newEndDate);
-        }
+    if (selectedService) {
+      setValue('price', selectedService.price / 100);
+      if (watchedStartDate) {
+        const newEndDate = moment(watchedStartDate).add(selectedService.duration, 'minutes').toDate();
+        setValue('end_date', newEndDate, { shouldValidate: true });
       }
     }
-  }, [watchedServiceId, watchedStartDate, services, setValue]);
+  }, [watchedServiceId, watchedStartDate, services, setValue, selectedService]);
 
   const professionalOptions = useMemo(() => {
     const allOption = { id: null, name: 'Todos os Profissionais', user_id: '' };
@@ -150,8 +154,8 @@ export default function Appointments() {
           service_id: undefined,
           price: undefined,
           attended: false,
-          appointment_date: moment(initialDate).toDate(),
-          end_date: moment(initialDate).add(30, 'minutes').toDate(),
+          appointment_date: moment(initialDate).hour(9).minute(0).second(0).toDate(),
+          end_date: moment(initialDate).hour(9).minute(30).second(0).toDate(),
       });
     }
     setIsModalOpen(true);
@@ -186,7 +190,6 @@ export default function Appointments() {
          showError("Dados inválidos.", "Cliente, profissional ou serviço não encontrado.");
          return;
      }
-     // ✅ CORREÇÃO APLICADA AQUI
      const appointmentData = {
        ...data,
        appointment_date: newStart.toISOString(),
@@ -419,51 +422,56 @@ export default function Appointments() {
                          {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>}
                        </div>
                        
-                       <div className="grid grid-cols-2 gap-4">
-                          <div>
-                           <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700 mb-1">Início *</label>
-                           <Controller
-                                name="appointment_date"
-                                control={control}
-                                render={({ field }) => (
-                                    <Calendar
-                                        id={field.name}
-                                        value={field.value}
-                                        onChange={(e) => field.onChange(e.value)}
-                                        showTime
-                                        hourFormat="24"
-                                        dateFormat="dd/mm/yy"
-                                        className="w-full"
-                                        placeholder="DD/MM/AAAA HH:mm"
-                                        locale="pt-BR"
-                                    />
-                                )}
-                            />
-                           {errors.appointment_date && <p className="mt-1 text-sm text-red-600">{errors.appointment_date.message}</p>}
-                         </div>
-                         <div>
-                           <label htmlFor="end_date" className="block text-sm font-medium text-gray-700 mb-1">Fim *</label>
-                            <Controller
-                                name="end_date"
-                                control={control}
-                                render={({ field }) => (
-                                    <Calendar
-                                        id={field.name}
-                                        value={field.value}
-                                        onChange={(e) => field.onChange(e.value)}
-                                        showTime
-                                        hourFormat="24"
-                                        dateFormat="dd/mm/yy"
-                                        className="w-full"
-                                        placeholder="DD/MM/AAAA HH:mm"
-                                        locale="pt-BR"
-                                        minDate={watchedStartDate}
-                                    />
-                                )}
-                            />
-                           {errors.end_date && <p className="mt-1 text-sm text-red-600">{errors.end_date.message}</p>}
-                         </div>
-                       </div>
+                       {/* <-- 3. ESTRUTURA DO FORMULÁRIO ALTERADA --> */}
+                       <div>
+                          <label htmlFor="appointment_date_date" className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
+                          <Controller
+                              name="appointment_date"
+                              control={control}
+                              render={({ field }) => (
+                                  <Calendar
+                                      id="appointment_date_date"
+                                      value={field.value}
+                                      onChange={(e) => {
+                                          const newDate = moment(e.value as Date);
+                                          const currentDate = moment(field.value);
+                                          // Mantém a hora e o minuto, atualiza apenas a data
+                                          currentDate.year(newDate.year()).month(newDate.month()).date(newDate.date());
+                                          field.onChange(currentDate.toDate());
+                                      }}
+                                      dateFormat="dd/mm/yy"
+                                      className="w-full"
+                                      placeholder="DD/MM/AAAA"
+                                      locale="pt-BR"
+                                  />
+                              )}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Horário *</label>
+                          <Controller
+                              name="appointment_date"
+                              control={control}
+                              render={({ field }) => (
+                                  <TimeSlotPicker
+                                      selectedDate={field.value}
+                                      appointments={appointments}
+                                      professionalId={watchedProfessionalId}
+                                      serviceDuration={serviceDuration}
+                                      value={field.value}
+                                      onChange={(newTimeValue: Date) => {
+                                          const currentDate = moment(field.value);
+                                          const newTime = moment(newTimeValue);
+                                          // Mantém a data, atualiza apenas a hora e o minuto
+                                          currentDate.hour(newTime.hour()).minute(newTime.minute());
+                                          field.onChange(currentDate.toDate());
+                                      }}
+                                  />
+                              )}
+                          />
+                          {errors.appointment_date && <p className="mt-1 text-sm text-red-600">{errors.appointment_date.message}</p>}
+                        </div>
                      </div>
                    </div>
                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse items-center">
