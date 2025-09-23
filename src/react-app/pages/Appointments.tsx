@@ -6,7 +6,7 @@ import { useAppStore } from '../../shared/store';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { TimeSlotPicker } from '../components/TimeSlotPicker'; // <-- 1. IMPORTADO
+import { TimeSlotPicker } from '../components/TimeSlotPicker';
 import { useToastHelpers } from '../contexts/ToastContext';
 import { Plus, X, User, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import moment from 'moment';
@@ -73,11 +73,15 @@ export default function Appointments() {
   const watchedClientId = watch('client_id');
   const watchedProfessionalId = watch('professional_id');
 
-  // <-- 2. WATCH PARA OBTER O SERVIÇO E DURAÇÃO
   const selectedService = useMemo(() => {
     return services.find(s => s.id === Number(watchedServiceId));
   }, [watchedServiceId, services]);
   const serviceDuration = selectedService?.duration || 30;
+
+  // NOVO: Encontra o objeto completo do profissional selecionado no formulário
+  const selectedProfessional = useMemo(() => {
+    return professionals.find(p => p.id === watchedProfessionalId) || null;
+  }, [watchedProfessionalId, professionals]);
 
   useEffect(() => {
     if (user) {
@@ -422,7 +426,6 @@ export default function Appointments() {
                          {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>}
                        </div>
                        
-                       {/* <-- 3. ESTRUTURA DO FORMULÁRIO ALTERADA --> */}
                        <div>
                           <label htmlFor="appointment_date_date" className="block text-sm font-medium text-gray-700 mb-1">Data *</label>
                           <Controller
@@ -435,7 +438,6 @@ export default function Appointments() {
                                       onChange={(e) => {
                                           const newDate = moment(e.value as Date);
                                           const currentDate = moment(field.value);
-                                          // Mantém a hora e o minuto, atualiza apenas a data
                                           currentDate.year(newDate.year()).month(newDate.month()).date(newDate.date());
                                           field.onChange(currentDate.toDate());
                                       }}
@@ -457,15 +459,13 @@ export default function Appointments() {
                                   <TimeSlotPicker
                                       selectedDate={field.value}
                                       appointments={appointments}
-                                      professionalId={watchedProfessionalId}
+                                      professional={selectedProfessional} // MODIFICADO: Passa o objeto completo
                                       serviceDuration={serviceDuration}
                                       value={field.value}
                                       onChange={(newTimeValue: Date) => {
-                                          const currentDate = moment(field.value);
-                                          const newTime = moment(newTimeValue);
-                                          // Mantém a data, atualiza apenas a hora e o minuto
-                                          currentDate.hour(newTime.hour()).minute(newTime.minute());
-                                          field.onChange(currentDate.toDate());
+                                        // A lógica de onChange do TimeSlotPicker já retorna a data completa.
+                                        // Apenas repassamos para o formulário.
+                                        field.onChange(newTimeValue);
                                       }}
                                   />
                               )}
